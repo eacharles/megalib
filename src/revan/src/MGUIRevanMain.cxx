@@ -58,7 +58,9 @@ ClassImp(MGUIRevanMain)
 MGUIRevanMain::MGUIRevanMain(MInterfaceRevan* Interface, MSettingsRevan* Data)
   : MGUIMain(660, 270, Interface, Data)
 {
+  m_Interface = new MInterfaceRevan();
   m_Interface = Interface;
+  m_Data = new MSettingsRevan();
   m_Data = Data;
 }
 
@@ -68,7 +70,7 @@ MGUIRevanMain::MGUIRevanMain(MInterfaceRevan* Interface, MSettingsRevan* Data)
 
 MGUIRevanMain::~MGUIRevanMain()
 {
-  // Standard destructor - in all normal exit cases the session have already 
+  // Standard destructor - in all normal exit cases the session have already
   // been deleted in CloseWindow
 }
 
@@ -79,11 +81,11 @@ MGUIRevanMain::~MGUIRevanMain()
 void MGUIRevanMain::Create()
 {
   // Create the main window
-  
+
   MGUIMain::Create();
 
   // We start with a name and an icon...
-  SetWindowName("Revan - Real event analyzer");  
+  SetWindowName("Revan - Real event analyzer");
 
   m_MenuReconstruction = new TGPopupMenu(fClient->GetRoot());
   m_MenuReconstruction->AddEntry("Start Event reconstruction", c_Start);
@@ -141,7 +143,7 @@ void MGUIRevanMain::Create()
   // Title:
   MString TitleIcon(g_MEGAlibPath + "/resource/icons/revan/Large.xpm");
   MFile::ExpandFileName(TitleIcon);
-  
+
   m_TitlePicture = fClient->GetPicture(TitleIcon);
   if (m_TitlePicture == 0) {
     mgui<<"Can't find picture "<<TitleIcon<<"! Aborting!"<<error;
@@ -151,7 +153,7 @@ void MGUIRevanMain::Create()
   m_TitleIconLayout = new TGLayoutHints(kLHintsCenterY | kLHintsCenterX, 0, 0, 10, 10);
   AddFrame(m_TitleIcon, m_TitleIconLayout);
 
-  // The status bars  
+  // The status bars
   m_StatusBarGeo->SetContent("Active:", MFile::GetBaseName(m_Data->GetGeometryFileName()));
   m_StatusBarGeo->Create();
   AddFrame(m_StatusBarGeo, m_StatusBarLayout);
@@ -162,7 +164,7 @@ void MGUIRevanMain::Create()
 
 
   MapSubwindows();
-  MapWindow();  
+  MapWindow();
   Layout();
 
   gSystem->ProcessEvents();
@@ -182,7 +184,7 @@ void MGUIRevanMain::Create()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MGUIRevanMain::ProcessMessage(long Message, long Parameter1, 
+bool MGUIRevanMain::ProcessMessage(long Message, long Parameter1,
                                      long Parameter2)
 {
   // Process the messages for this application
@@ -229,7 +231,7 @@ bool MGUIRevanMain::ProcessMessage(long Message, long Parameter1,
       case c_OptionsDecay:
         new MGUIOptionsDecay(gClient->GetRoot(), this, m_Data);
         break;
-        
+
       case c_Test:
         m_Interface->Test();
         //m_Interface->InitializeEventView();
@@ -241,14 +243,14 @@ bool MGUIRevanMain::ProcessMessage(long Message, long Parameter1,
         break;
 
       case c_Spectrum:
-        new MGUIReconstructedSpectrum(gClient->GetRoot(), this, m_Data, OKPressed);        
+        new MGUIReconstructedSpectrum(gClient->GetRoot(), this, m_Data, OKPressed);
         if (OKPressed == true) {
           m_Interface->GenerateSpectra();
         }
         break;
 
       case c_ExportSpectrum:
-        new MGUIExportSpectrum(gClient->GetRoot(), this, m_Data, OKPressed);        
+        new MGUIExportSpectrum(gClient->GetRoot(), this, m_Data, OKPressed);
         if (OKPressed == true) {
           m_Interface->ExportSpectrum();
         }
@@ -342,7 +344,7 @@ bool MGUIRevanMain::ProcessMessage(long Message, long Parameter1,
   default:
     break;
   }
-  
+
   return true;
 }
 
@@ -392,14 +394,14 @@ void MGUIRevanMain::Open()
   Info.fFileTypes = (const char **) Types;
   Info.fIniDir = StrDup(gSystem->DirName(m_Data->GetCurrentFileName()));
   new TGFileDialog(gClient->GetRoot(), this, kFDOpen, &Info);
-  
+
   delete [] Types;
-  
+
   // Get the filename ...
   if ((char *) Info.fFilename != 0) {
     m_Data->SetCurrentFileName(MString(Info.fFilename));
     UpdateConfiguration();
-  } 
+  }
   // ... or return when cancel has been pressed
   else {
     return;
@@ -438,13 +440,13 @@ void MGUIRevanMain::About()
 
 void MGUIRevanMain::Launch()
 {
-  // This method is called after pressing the MEGA-button in the 
+  // This method is called after pressing the MEGA-button in the
   // M.I.Works main GUI:
   // The reconstruction is started.
-  
+
   MString Name = m_Data->GetCurrentFileName();
 
-  if (Name.EndsWith("sim") == false && Name.EndsWith("evta") == false && 
+  if (Name.EndsWith("sim") == false && Name.EndsWith("evta") == false &&
       Name.EndsWith("sim.gz") == false && Name.EndsWith("evta.gz") == false) {
     mgui<<"The input file of Revan needs to have the suffix \"sim\", \"sim.gz\", \"evta\", or \"evta.gz\"!"<<error;
     return;

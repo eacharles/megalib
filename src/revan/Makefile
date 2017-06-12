@@ -44,6 +44,8 @@ LOBJS = $(LB)/MGeometryRevan.o \
 				$(LB)/MERTrackGas.o \
 				$(LB)/MERTrackDirectional.o \
 				$(LB)/MERTrackChiSquare.o \
+				$(LB)/MERTrackKalman3D.o \
+				$(LB)/MERTrackKalman2D.o \
 				$(LB)/MERCSR.o \
 				$(LB)/MERCSRChiSquare.o \
 				$(LB)/MERCSREnergyRecovery.o \
@@ -66,7 +68,7 @@ LOBJS = $(LB)/MGeometryRevan.o \
 				$(LB)/MREAMGuardringHit.o \
 				$(LB)/MREAMDirectional.o \
 				$(LB)/MREAMStartInformation.o \
-				
+
 
 OBJS = $(MOBJS) $(LOBJS) $(GOBJS)
 
@@ -118,6 +120,3 @@ $(PRG): $(MOBJS) $(SLOBJ) $(SGOBJ)
 
 #
 #----------------------------------------------------------------
-
-
-

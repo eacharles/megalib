@@ -36,7 +36,7 @@ class MSettingsEventReconstruction : public MSettingsInterface
 
   void SetSaveOI(bool SaveOI) { m_SaveOI = SaveOI; }
   bool GetSaveOI() const { return m_SaveOI; }
-  
+
   void SetNJobs(unsigned int ID) { m_NJobs = ID; }
   unsigned int GetNJobs() { return m_NJobs; }
 
@@ -49,19 +49,22 @@ class MSettingsEventReconstruction : public MSettingsInterface
   void SetTrackingAlgorithm(int ID) { m_TrackingAlgorithm = ID; }
   int GetTrackingAlgorithm() { return m_TrackingAlgorithm; }
 
+  void SetPairAlgorithm(int ID) { m_PairAlgorithm = ID; }
+  int GetPairAlgorithm() { return m_PairAlgorithm; }
+
   void SetCSRAlgorithm(int ID) { m_CSRAlgorithm = ID; }
   int GetCSRAlgorithm() { return m_CSRAlgorithm; }
 
   void SetDecayAlgorithm(int ID) { m_DecayAlgorithm = ID; }
   int GetDecayAlgorithm() { return m_DecayAlgorithm; }
-  
+
   void SetCoincidenceWindow(double Time) {
     m_CoincidenceWindow = Time;
   }
   double GetCoincidenceWindow() {
     return m_CoincidenceWindow;
   }
-  
+
   void SetStandardClusterizerMinDistanceD1(double MinDistance) {
     m_StandardClusterizerMinDistanceD1 = MinDistance;
   }
@@ -138,7 +141,7 @@ class MSettingsEventReconstruction : public MSettingsInterface
   int GetAdjacentLevel() const {
     return m_AdjacentLevel;
   }
-  
+
   void SetPDFClusterizerBaseFileName(MString BaseFileName) {
     m_PDFClusterizerBaseFileName = BaseFileName;
   }
@@ -168,6 +171,11 @@ class MSettingsEventReconstruction : public MSettingsInterface
   void SetNLayersForVertexSearch(int Value) { m_NLayersForVertexSearch = Value; }
   int GetNLayersForVertexSearch() { return m_NLayersForVertexSearch; }
 
+  void SetHeightX0(double Value) { m_HeightX0 = Value; }
+  double GetHeightX0() { return m_HeightX0; }
+  void SetSigmaHitPos(double Value) { m_SigmaHitPos = Value; }
+  double GetSigmaHitPos() { return m_SigmaHitPos; }
+
 
   void RemoveAllElectronTrackingDetectors() { m_ElectronTrackingDetectors.clear(); }
   void AddElectronTrackingDetector(const MString& ElectronTracking) { m_ElectronTrackingDetectors.push_back(ElectronTracking); }
@@ -189,10 +197,10 @@ class MSettingsEventReconstruction : public MSettingsInterface
   bool GetGuaranteeStartD1() { return m_GuaranteeStartD1; }
   void SetRejectOneDetectorTypeOnlyEvents(bool Flag) { m_RejectOneDetectorTypeOnlyEvents = Flag; }
   bool GetRejectOneDetectorTypeOnlyEvents() { return m_RejectOneDetectorTypeOnlyEvents; }
-  
+
   void SetCSRThresholdMin(double Value) { m_CSRThresholdMin = Value; }
   double GetCSRThresholdMin() { return m_CSRThresholdMin; }
-  
+
   void SetCSRThresholdMax(double Value) { m_CSRThresholdMax = Value; }
   double GetCSRThresholdMax() { return m_CSRThresholdMax; }
 
@@ -201,13 +209,13 @@ class MSettingsEventReconstruction : public MSettingsInterface
 
   void SetBayesianElectronFileName(MString Name) { m_BayesianElectronFileName = Name; }
   MString GetBayesianElectronFileName() { return m_BayesianElectronFileName; }
-  
+
   void SetBayesianComptonFileName(MString Name) { m_BayesianComptonFileName = Name; }
   MString GetBayesianComptonFileName() { return m_BayesianComptonFileName; }
-  
+
   void SetNeuralNetworkFileName(MString Name) { m_NeuralNetworkFileName = Name; }
   MString GetNeuralNetworkFileName() { return m_NeuralNetworkFileName; }
-  
+
   void SetOriginObjectsFileName(MString Name) { m_OriginObjectsFileName = Name; }
   MString GetOriginObjectsFileName() { return m_OriginObjectsFileName; }
 
@@ -225,12 +233,12 @@ class MSettingsEventReconstruction : public MSettingsInterface
   double GetTotalEnergyMax() { return m_TotalEnergyMax; }
   void SetTotalEnergyMin(double Value) { m_TotalEnergyMin = Value; }
   double GetTotalEnergyMin() { return m_TotalEnergyMin; }
-  
+
   void SetLeverArmMax(double Value) { m_LeverArmMax = Value; }
   double GetLeverArmMax() { return m_LeverArmMax; }
   void SetLeverArmMin(double Value) { m_LeverArmMin = Value; }
   double GetLeverArmMin() { return m_LeverArmMin; }
-  
+
   void SetEventIdMax(long Value) { m_EventIdMax = Value; }
   long GetEventIdMax() { return m_EventIdMax; }
   void SetEventIdMin(long Value) { m_EventIdMin = Value; }
@@ -260,11 +268,12 @@ class MSettingsEventReconstruction : public MSettingsInterface
 
   //! Save the OI information
   bool m_SaveOI;
-  
+
   // Reconstruction options:
   int m_CoincidenceAlgorithm;
   int m_ClusteringAlgorithm;
   int m_TrackingAlgorithm;
+  int m_PairAlgorithm;
   int m_CSRAlgorithm;
   int m_DecayAlgorithm;
 
@@ -298,11 +307,13 @@ class MSettingsEventReconstruction : public MSettingsInterface
   int m_NTrackSequencesToKeep;
   bool m_RejectPurelyAmbiguousTrackSequences;
   int m_NLayersForVertexSearch;
+  double m_HeightX0;
+  double m_SigmaHitPos;
 
   MString m_BayesianElectronFileName;
 
   vector<MString> m_ElectronTrackingDetectors;
-  
+
   // Compton tracking:
   bool m_AssumeD1First;
   int m_ClassicUndecidedHandling;
@@ -310,15 +321,15 @@ class MSettingsEventReconstruction : public MSettingsInterface
   bool m_UseComptelTypeEvents;
   bool m_GuaranteeStartD1;
   bool m_RejectOneDetectorTypeOnlyEvents;
-  
+
   double m_CSRThresholdMin;
   double m_CSRThresholdMax;
   int m_CSRMaxNHits;
-  
+
   MString m_BayesianComptonFileName;
-  
+
   MString m_NeuralNetworkFileName;
-  
+
   MVector m_LensCenter;
   MVector m_FocalSpotCenter;
   MString m_OriginObjectsFileName;

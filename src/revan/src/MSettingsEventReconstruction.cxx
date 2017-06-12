@@ -50,6 +50,7 @@ MSettingsEventReconstruction::MSettingsEventReconstruction() : MSettingsInterfac
   m_CoincidenceAlgorithm = 0;
   m_ClusteringAlgorithm = 2;
   m_TrackingAlgorithm = 0;
+  m_PairAlgorithm = 0;
   m_CSRAlgorithm = 1;
   m_DecayAlgorithm = 0;
 
@@ -85,17 +86,21 @@ MSettingsEventReconstruction::MSettingsEventReconstruction() : MSettingsInterfac
   m_NLayersForVertexSearch = 6;
 
   m_ElectronTrackingDetectors.clear();
-  
+
+  // Kalman Filter
+  m_SigmaHitPos = 0.00693;
+  m_HeightX0 = 0.005336179;
+
   // Compton tracking
   m_RejectOneDetectorTypeOnlyEvents = false;
   m_GuaranteeStartD1 = false;
   m_UseComptelTypeEvents = true;
 
-  m_ClassicUndecidedHandling = 0; 
+  m_ClassicUndecidedHandling = 0;
 
   m_AssumeD1First = false;
   m_AssumeTrackTopBottom = false;
-  
+
   m_CSRThresholdMin = 0;
   m_CSRThresholdMax = 1000;
 
@@ -110,7 +115,7 @@ MSettingsEventReconstruction::MSettingsEventReconstruction() : MSettingsInterfac
   m_BayesianElectronFileName = "";
 
   m_NeuralNetworkFileName = "";
-  
+
   // General options:
   m_TotalEnergyMin = 0;
   m_TotalEnergyMax = 1000000;
@@ -149,6 +154,7 @@ bool MSettingsEventReconstruction::WriteXml(MXmlNode* Node)
   new MXmlNode(Node, "CoincidenceAlgorithm", m_CoincidenceAlgorithm);
   new MXmlNode(Node, "ClusteringAlgorithm", m_ClusteringAlgorithm);
   new MXmlNode(Node, "TrackingAlgorithm", m_TrackingAlgorithm);
+  new MXmlNode(Node, "PairAlgorithm", m_PairAlgorithm);
   new MXmlNode(Node, "CSRAlgorithm", m_CSRAlgorithm);
   new MXmlNode(Node, "DecayAlgorithm", m_DecayAlgorithm);
   new MXmlNode(Node, "CoincidenceWindow", m_CoincidenceWindow);
@@ -174,13 +180,15 @@ bool MSettingsEventReconstruction::WriteXml(MXmlNode* Node)
   new MXmlNode(Node, "NTrackSequencesToKeep", m_NTrackSequencesToKeep);
   new MXmlNode(Node, "RejectPurelyAmbiguousTrackSequences", m_RejectPurelyAmbiguousTrackSequences);
   new MXmlNode(Node, "NLayersForVertexSearch", m_NLayersForVertexSearch);
-  
+  new MXmlNode(Node, "SigmaHitPos", m_SigmaHitPos);
+  new MXmlNode(Node, "HeightX0", m_HeightX0);
+
   MXmlNode* aNode = new MXmlNode(Node, "ElectronTrackingDetectors");
   for (unsigned int i = 0; i < m_ElectronTrackingDetectors.size(); ++i) {
     new MXmlNode(aNode, "ElectronTrackingDetector",  m_ElectronTrackingDetectors[i]);
   }
 
-  
+
   new MXmlNode(Node, "AssumeD1First", m_AssumeD1First);
   new MXmlNode(Node, "ClassicUndecidedHandling", m_ClassicUndecidedHandling);
   new MXmlNode(Node, "AssumeTrackTopBottom", m_AssumeTrackTopBottom);
@@ -197,7 +205,7 @@ bool MSettingsEventReconstruction::WriteXml(MXmlNode* Node)
   new MXmlNode(Node, "BayesianComptonFile", CleanPath(m_BayesianComptonFileName));
   new MXmlNode(Node, "BayesianElectronFile", CleanPath(m_BayesianElectronFileName));
   new MXmlNode(Node, "NeuralNetworkFile", CleanPath(m_NeuralNetworkFileName));
-  
+
   new MXmlNode(Node, "TotalEnergy", m_TotalEnergyMin, m_TotalEnergyMax);
   new MXmlNode(Node, "LeverArm", m_LeverArmMin, m_LeverArmMax);
   new MXmlNode(Node, "EventId", m_EventIdMin, m_EventIdMax);
@@ -211,7 +219,7 @@ bool MSettingsEventReconstruction::WriteXml(MXmlNode* Node)
 
 
 bool MSettingsEventReconstruction::ReadXml(MXmlNode* Node)
-{  
+{
   MXmlNode* aNode = 0;
   MXmlNode* bNode = 0;
 
@@ -223,7 +231,7 @@ bool MSettingsEventReconstruction::ReadXml(MXmlNode* Node)
     m_Save = aNode->GetValueAsBoolean();
   }
   */
-  
+
   if ((aNode = Node->GetNode("ClusteringAlgorithm")) != 0) {
     m_ClusteringAlgorithm = aNode->GetValueAsInt();
   }
@@ -232,6 +240,9 @@ bool MSettingsEventReconstruction::ReadXml(MXmlNode* Node)
   }
   if ((aNode = Node->GetNode("TrackingAlgorithm")) != 0) {
     m_TrackingAlgorithm = aNode->GetValueAsInt();
+  }
+  if ((aNode = Node->GetNode("PairAlgorithm")) != 0) {
+    m_PairAlgorithm = aNode->GetValueAsInt();
   }
   if ((aNode = Node->GetNode("CSRAlgorithm")) != 0) {
     m_CSRAlgorithm = aNode->GetValueAsInt();
@@ -301,6 +312,12 @@ bool MSettingsEventReconstruction::ReadXml(MXmlNode* Node)
   }
   if ((aNode = Node->GetNode("NLayersForVertexSearch")) != 0) {
     m_NLayersForVertexSearch = aNode->GetValueAsInt();
+  }
+  if ((aNode = Node->GetNode("SigmaHitPos")) != 0) {
+    m_SigmaHitPos = aNode->GetValueAsDouble();
+  }
+  if ((aNode = Node->GetNode("HeightX0")) != 0) {
+    m_HeightX0 = aNode->GetValueAsDouble();
   }
   if ((aNode = Node->GetNode("ElectronTrackingDetectors")) != 0) {
     m_ElectronTrackingDetectors.clear();
@@ -374,7 +391,7 @@ bool MSettingsEventReconstruction::ReadXml(MXmlNode* Node)
 
   return true;
 }
-  
+
 
 // MSettingsEventReconstruction.cxx: the end...
 ////////////////////////////////////////////////////////////////////////////////

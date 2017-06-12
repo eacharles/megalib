@@ -170,7 +170,7 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
         cout<<Usage.str()<<endl;
         return false;
       }
-    }   
+    }
     // Double argument
     //     if (Option == "-c" || Option == "--calibrate") {
     //      if (!((argc > i+2) && argv[i+1][0] != '-' && argv[i+2][0] != '-')){
@@ -181,7 +181,7 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
     //    }
 
   }
-    
+
   // Now parse all low level options
   for (int i = 1; i < argc; i++) {
     Option = argv[i];
@@ -197,13 +197,13 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
       cout<<"Command-line parser: Use configuration file "<<m_Data->GetSettingsFileName()<<endl;
     }
   }
-  
+
   // Look if we need to change the configuration
   for (int i = 1; i < argc; i++) {
     Option = argv[i];
     if (Option == "--change-configuration" || Option == "-C") {
       if (m_Data->Change(argv[++i]) == false) {
-        cout<<"ERROR: Command-line parser: Unable to change this configuration value: "<<argv[i]<<endl;        
+        cout<<"ERROR: Command-line parser: Unable to change this configuration value: "<<argv[i]<<endl;
       } else {
         cout<<"Command-line parser: Changing this configuration value: "<<argv[i]<<endl;
       }
@@ -274,7 +274,7 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
       return true;
     }
   }
-   
+
   // Execute some low level commands
   if (m_UseGui == true) {
     m_Gui = new MGUIRevanMain(this, m_Data);
@@ -295,7 +295,7 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
 
 
 bool MInterfaceRevan::LoadConfiguration(MString FileName)
-{  
+{
   // Load the configuration file
 
   if (m_Data == 0) {
@@ -360,7 +360,7 @@ bool MInterfaceRevan::SetGeometry(MString FileName, bool UpdateGui)
 
   m_Data->SetGeometryFileName(FileName);
   mout<<"Geometry "<<m_Geometry->GetName()<<" loaded!"<<endl;
-  
+
   if (m_UseGui == true && UpdateGui == true) {
     m_Gui->UpdateConfiguration();
   }
@@ -371,7 +371,7 @@ bool MInterfaceRevan::SetGeometry(MString FileName, bool UpdateGui)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-  
+
 bool MInterfaceRevan::IsInitialized()
 {
   if (m_Geometry == 0) {
@@ -385,7 +385,7 @@ bool MInterfaceRevan::IsInitialized()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-  
+
 void MInterfaceRevan::SetGuiData(MRawEventAnalyzer& REA)
 {
   // Transfer Gui data to the analyzer
@@ -401,7 +401,7 @@ void MInterfaceRevan::SetGuiData(MRawEventAnalyzer& REA)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-  
+
 void MInterfaceRevan::AnalyzeEvents()
 {
   // Start Revan main program and analyze all events...
@@ -426,7 +426,7 @@ void MInterfaceRevan::AnalyzeEvents()
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
   if (Analyzer.SetOutputModeFile(FilenameOut) == false) return;
   SetGuiData(Analyzer);
-  
+
   if (Analyzer.PreAnalysis() == false) {
     mout<<"Event reconstruction: Initialization failed."<<endl;
     return;
@@ -437,7 +437,7 @@ void MInterfaceRevan::AnalyzeEvents()
   } while (ReturnCode != MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile && ReturnCode != MRawEventAnalyzer::c_AnalysisSavingEventFailed);
   if (Analyzer.PostAnalysis() == false) {
     mout<<"Event reconstruction: Postprocessing failed"<<endl;
-    return;   
+    return;
   }
 
   mout<<"Event reconstruction finished in "<<Timer.ElapsedTime()<<" sec."<<endl;
@@ -462,19 +462,19 @@ void MInterfaceRevan::GenerateSpectra()
 
   bool BeforeReconstruction = m_Data->GetSpectrumBefore();
   bool AfterReconstruction = m_Data->GetSpectrumAfter();
-  
+
   bool ByInstrument = m_Data->GetSpectrumSortByInstrument();
   bool ByDetectorType = m_Data->GetSpectrumSortByDetectorType();
   bool ByDetector = m_Data->GetSpectrumSortByDetector();
-  
+
   bool Combine = m_Data->GetSpectrumCombine();
-  
+
   bool OutputScreen = m_Data->GetSpectrumOutputToScreen();
   bool OutputFile = m_Data->GetSpectrumOutputToFile();
-  
+
   vector<TH1D*> AllSpectra;
-  
-  
+
+
   // Step 1: Let's create all the histograms:
   TH1D* SpectrumBeforeByInstrument = nullptr;
   map<int, TH1D*> SpectrumBeforeByDetectorType;
@@ -484,7 +484,7 @@ void MInterfaceRevan::GenerateSpectra()
       if (Combine == true) {
         SpectrumBeforeByInstrument = new TH1D("SpectrumCobinedBeforeByInstrument", "Event spectrum before reconstruction for the whole instrument", xNBins, xBins);
       } else {
-        SpectrumBeforeByInstrument = new TH1D("HitSpectrumBeforeByInstrument", "Hit spectrum before reconstruction for the whole instrument", xNBins, xBins);        
+        SpectrumBeforeByInstrument = new TH1D("HitSpectrumBeforeByInstrument", "Hit spectrum before reconstruction for the whole instrument", xNBins, xBins);
       }
       AllSpectra.push_back(SpectrumBeforeByInstrument);
     }
@@ -492,10 +492,10 @@ void MInterfaceRevan::GenerateSpectra()
       // Generated on the fly
     }
     if (ByDetector == true) {
-      // Generated on the fly      
+      // Generated on the fly
     }
   }
-  
+
   TH1D* SpectrumAfterByInstrument = nullptr;
   map<int, TH1D*> SpectrumAfterByDetectorType;
   map<MVector, TH1D*> SpectrumAfterByDetector;
@@ -504,25 +504,25 @@ void MInterfaceRevan::GenerateSpectra()
       if (Combine == true) {
         SpectrumAfterByInstrument = new TH1D("SpectrumCombinedAfterByInstrument", "Event spectrum after reconstruction for the whole instrument", xNBins, xBins);
       } else {
-        SpectrumAfterByInstrument = new TH1D("HitSpectrumAfterByInstrument", "Hit spectrum after reconstruction for the whole instrument", xNBins, xBins);        
+        SpectrumAfterByInstrument = new TH1D("HitSpectrumAfterByInstrument", "Hit spectrum after reconstruction for the whole instrument", xNBins, xBins);
       }
       AllSpectra.push_back(SpectrumAfterByInstrument);
     }
     if (ByDetectorType == true) {
-      // Generated on the fly      
+      // Generated on the fly
     }
     if (ByDetector == true) {
       // Generated on the fly
-    }    
+    }
   }
-  
-  
+
+
   // Step 2: Let's fill all the histograms:
 
   MRawEventAnalyzer Analyzer;
   Analyzer.SetGeometry(m_Geometry);
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
-  
+
   SetGuiData(Analyzer);
   Analyzer.SetTotalEnergyMin(xMin);
   Analyzer.SetTotalEnergyMax(xMax);
@@ -531,16 +531,16 @@ void MInterfaceRevan::GenerateSpectra()
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
-    
+
     MRERawEvent* Before = Analyzer.GetInitialRawEvent();
     MRERawEvent* After = Analyzer.GetOptimumEvent();
-    
+
     // BEFORE :
     if (BeforeReconstruction == true && Before != nullptr) {
-      
+
       if (ByInstrument == true) {
         if (Combine == true) {
           SpectrumBeforeByInstrument->Fill(Before->GetEnergy());
@@ -550,7 +550,7 @@ void MInterfaceRevan::GenerateSpectra()
           }
         }
       }
-      
+
       if (ByDetectorType == true) {
         if (Combine == true) {
           map<int, double> EnergyBeforeByDetectorType;
@@ -559,18 +559,18 @@ void MInterfaceRevan::GenerateSpectra()
           }
           for (auto E: EnergyBeforeByDetectorType) {
             if (SpectrumBeforeByDetectorType[E.first] == nullptr) {
-              TH1D* H = new TH1D(MString("SpectrumBeforeCombinedByDetectorType_") + E.first, 
+              TH1D* H = new TH1D(MString("SpectrumBeforeCombinedByDetectorType_") + E.first,
                                  MString("Spectrum before reconstruction for detector type ") + E.first + MString(" (individual hits of the events have been combined)"), xNBins, xBins);
               SpectrumBeforeByDetectorType[E.first] = H;
               AllSpectra.push_back(H);
             }
             SpectrumBeforeByDetectorType[E.first]->Fill(E.second);
-          }        
+          }
         } else {
           for (int r = 0; r < Before->GetNRESEs(); ++r) {
             int DetectorType = Before->GetRESEAt(r)->GetDetector();
             if (SpectrumBeforeByDetectorType[DetectorType] == nullptr) {
-              TH1D* H = new TH1D(MString("HitSpectrumBeforeByDetectorType_") + DetectorType, 
+              TH1D* H = new TH1D(MString("HitSpectrumBeforeByDetectorType_") + DetectorType,
                                  MString("Spectrum for individual hits before reconstruction for detector type ") + DetectorType, xNBins, xBins);
               SpectrumBeforeByDetectorType[DetectorType] = H;
               AllSpectra.push_back(H);
@@ -579,7 +579,7 @@ void MInterfaceRevan::GenerateSpectra()
           }
         }
       }
-      
+
       if (ByDetector == true) {
         if (Combine == true) {
           map<MVector, double> EnergyBeforeByDetector;
@@ -591,7 +591,7 @@ void MInterfaceRevan::GenerateSpectra()
           for (auto E: EnergyBeforeByDetector) {
             MVector Pos = E.first;
             if (SpectrumBeforeByDetector[E.first] == nullptr) {
-              TH1D* H = new TH1D(MString("SpectrumBeforeCombinedByDetector_") + Pos.ToString(), 
+              TH1D* H = new TH1D(MString("SpectrumBeforeCombinedByDetector_") + Pos.ToString(),
                                 MString("Spectrum before reconstruction for detector at position ") + Pos.ToString() + MString(" (individual hits of the events have been combined)"),  xNBins, xBins);
               SpectrumBeforeByDetector[E.first] = H;
               AllSpectra.push_back(H);
@@ -603,7 +603,7 @@ void MInterfaceRevan::GenerateSpectra()
             MVector Position = Before->GetRESEAt(r)->GetVolumeSequence()->GetDeepestVolume()->GetShape()->GetUniquePosition();
             Position = Before->GetRESEAt(r)->GetVolumeSequence()->GetPositionInFirstVolume(Position, Before->GetRESEAt(r)->GetVolumeSequence()->GetDeepestVolume());
             if (SpectrumBeforeByDetector[Position] == nullptr) {
-              TH1D* H = new TH1D(MString("HitSpectrumBeforeByDetector_") + Position.ToString(), 
+              TH1D* H = new TH1D(MString("HitSpectrumBeforeByDetector_") + Position.ToString(),
                                 MString("Spectrum for individual hits before reconstruction for detector at position ") + Position.ToString(),  xNBins, xBins);
               SpectrumBeforeByDetector[Position] = H;
               AllSpectra.push_back(H);
@@ -613,12 +613,12 @@ void MInterfaceRevan::GenerateSpectra()
         }
       } // By detector
     } // BEFORE
-    
-    
-    
+
+
+
     // AFTER
     if (AfterReconstruction == true && After != nullptr) {
-      
+
       if (ByInstrument == true) {
         if (Combine == true) {
           SpectrumAfterByInstrument->Fill(After->GetEnergy());
@@ -628,7 +628,7 @@ void MInterfaceRevan::GenerateSpectra()
           }
         }
       }
-      
+
       if (ByDetectorType == true) {
         if (Combine == true) {
           map<int, double> EnergyAfterByDetectorType;
@@ -637,7 +637,7 @@ void MInterfaceRevan::GenerateSpectra()
           }
           for (auto E: EnergyAfterByDetectorType) {
             if (SpectrumAfterByDetectorType[E.first] == nullptr) {
-              TH1D* H = new TH1D(MString("SpectrumAfterCombinedByDetectorType_") + E.first, 
+              TH1D* H = new TH1D(MString("SpectrumAfterCombinedByDetectorType_") + E.first,
                                  MString("Spectrum after reconstruction for detector type ") + E.first + MString(" (individual hits of the events have been combined)"), xNBins, xBins);
               SpectrumAfterByDetectorType[E.first] = H;
               AllSpectra.push_back(H);
@@ -647,21 +647,21 @@ void MInterfaceRevan::GenerateSpectra()
               cout<<E.second<<endl;
               cout<<After->ToString()<<endl;
             }
-          }        
+          }
         } else {
           for (int r = 0; r < After->GetNRESEs(); ++r) {
             int DetectorType = After->GetRESEAt(r)->GetDetector();
             if (SpectrumAfterByDetectorType[DetectorType] == nullptr) {
-              TH1D* H = new TH1D(MString("HitSpectrumAfterByDetectorType_") + DetectorType, 
+              TH1D* H = new TH1D(MString("HitSpectrumAfterByDetectorType_") + DetectorType,
                                  MString("Spectrum for individual hits after reconstruction for detector type ") + DetectorType, xNBins, xBins);
               SpectrumAfterByDetectorType[DetectorType] = H;
               AllSpectra.push_back(H);
             }
             SpectrumAfterByDetectorType[DetectorType]->Fill(After->GetRESEAt(r)->GetEnergy());
           }
-        }      
+        }
       }
-      
+
       if (ByDetector == true) {
         if (Combine == true) {
           map<MVector, double> EnergyAfterByDetector;
@@ -673,7 +673,7 @@ void MInterfaceRevan::GenerateSpectra()
           for (auto E: EnergyAfterByDetector) {
             MVector Pos = E.first;
             if (SpectrumAfterByDetector[E.first] == nullptr) {
-              TH1D* H = new TH1D(MString("SpectrumAfterCombinedByDetector_") + Pos.ToString(), 
+              TH1D* H = new TH1D(MString("SpectrumAfterCombinedByDetector_") + Pos.ToString(),
                                 MString("Spectrum after reconstruction for detector at position ") + Pos.ToString() + MString(" (individual hits of the events have been combined)"),  xNBins, xBins);
               SpectrumAfterByDetector[E.first] = H;
               AllSpectra.push_back(H);
@@ -685,7 +685,7 @@ void MInterfaceRevan::GenerateSpectra()
             MVector Position = After->GetRESEAt(r)->GetVolumeSequence()->GetDeepestVolume()->GetShape()->GetUniquePosition();
             Position = After->GetRESEAt(r)->GetVolumeSequence()->GetPositionInFirstVolume(Position, After->GetRESEAt(r)->GetVolumeSequence()->GetDeepestVolume());
             if (SpectrumAfterByDetector[Position] == nullptr) {
-              TH1D* H = new TH1D(MString("HitSpectrumAfterByDetector_") + Position.ToString(), 
+              TH1D* H = new TH1D(MString("HitSpectrumAfterByDetector_") + Position.ToString(),
                                 MString("Spectrum for individual hits after reconstruction for detector at position ") + Position.ToString(),  xNBins, xBins);
               SpectrumAfterByDetector[Position] = H;
               AllSpectra.push_back(H);
@@ -695,23 +695,23 @@ void MInterfaceRevan::GenerateSpectra()
         }
       } // By detector
     } // AFTER
-    
+
   } while (true);
 
   if (Analyzer.PostAnalysis() == false) return;
-  
-  
+
+
   // Step 3: Nicen it!
-  
+
   for (TH1D* Hist: AllSpectra) {
     Hist->SetBit(kCanDelete);
     Hist->SetStats(false);
     Hist->SetFillColor(8);
     Hist->GetXaxis()->SetTitle("Energy [keV]");
-    Hist->GetYaxis()->SetTitle("counts/keV"); 
+    Hist->GetYaxis()->SetTitle("counts/keV");
   }
-  
-   
+
+
   // Step 4: Dump it!
 
   if (OutputScreen == true) {
@@ -722,7 +722,7 @@ void MInterfaceRevan::GenerateSpectra()
         mgui<<"We only display up to "<<MaxCanvases<<" individual spectra"<<info;
         break;
       }
-      
+
       TCanvas* C = new TCanvas();
       C->cd();
       if (xLog == true) C->SetLogx();
@@ -730,23 +730,23 @@ void MInterfaceRevan::GenerateSpectra()
       C->Update();
     }
   }
-  
+
   if (OutputFile == true) {
     for (TH1D* Hist: AllSpectra) {
       MString FileName = m_Data->GetCurrentFileName();
       if (FileName.EndsWith(".gz")) {
-        FileName.RemoveLast(3); 
+        FileName.RemoveLast(3);
       }
       if (FileName.EndsWith(".sim")) {
-        FileName.RemoveLast(4); 
+        FileName.RemoveLast(4);
       }
       if (FileName.EndsWith(".evta")) {
-        FileName.RemoveLast(5); 
+        FileName.RemoveLast(5);
       }
       FileName += "_";
       FileName += Hist->GetName();
       FileName += ".dat";
-      
+
       ofstream out(FileName);
       out<<"# "<<Hist->GetTitle()<<endl;
       out<<"# File: "<<m_Data->GetCurrentFileName()<<endl;
@@ -791,7 +791,7 @@ void MInterfaceRevan::ExportSpectrum()
 
   TH1D* Hist = new TH1D("InitialEnergySpectrum", "Initial energy spectrum",  xNBins, xBins);
   Hist->SetBit(kCanDelete);
-  
+
   MRawEventAnalyzer Analyzer;
   Analyzer.SetGeometry(m_Geometry);
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
@@ -851,7 +851,7 @@ void MInterfaceRevan::InitialEnergySpectrum()
   Hist->GetXaxis()->SetTitle("Energy [keV]");
   Hist->GetYaxis()->SetTitle("counts/keV");
   //Hist->GetYaxis()->SetTitle("counts/keV/s");
-  
+
   MRawEventAnalyzer Analyzer;
   Analyzer.SetGeometry(m_Geometry);
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
@@ -974,11 +974,11 @@ void MInterfaceRevan::Coincidence()
   Hist->GetXaxis()->SetTitle("Time [s]");
   Hist->GetYaxis()->SetTitle("counts");
   //Hist->GetYaxis()->SetTitle("counts/keV/s");
-  
+
   MRawEventAnalyzer Analyzer;
   Analyzer.SetGeometry(m_Geometry);
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
-  
+
   SetGuiData(Analyzer);
   if (Analyzer.PreAnalysis() == false) return;
 
@@ -990,7 +990,7 @@ void MInterfaceRevan::Coincidence()
       continue;
     }
     Hist->Fill(fabs((This->GetEventTime() - Last->GetEventTime()).GetAsSeconds()));
-    
+
     delete Last;
     Last = This;
   }
@@ -1022,14 +1022,14 @@ void MInterfaceRevan::TriggerStatistics()
   Reader->ShowProgress();
 
   MRERawEvent* RE = 0;
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     delete RE;
   }
   mout<<Reader->GetERNoising()->ToString()<<endl;
 
   delete Reader;
 
-  return; 
+  return;
 }
 
 
@@ -1045,12 +1045,12 @@ void MInterfaceRevan::TriggerStatistics()
 //   if (Analyzer.PreAnalysis() == false) return;
 
 
-//   TH1D* CSRGood = new TH1D("CSR Good Test Statistics", "CSR Good Test Statistics", 
+//   TH1D* CSRGood = new TH1D("CSR Good Test Statistics", "CSR Good Test Statistics",
 //         50, m_Data->GetCSRThresholdMin(), m_Data->GetCSRThresholdMax());
 //   CSRGood->SetBit(kCanDelete);
 //   CSRGood->SetFillColor(8);
 
-//   TH1D* CSRAll = new TH1D("CSR All Test Statistics", "CSR All Test Statistics", 
+//   TH1D* CSRAll = new TH1D("CSR All Test Statistics", "CSR All Test Statistics",
 //        50, m_Data->GetCSRThresholdMin(), m_Data->GetCSRThresholdMax());
 //   CSRAll->SetBit(kCanDelete);
 //   CSRAll->SetFillColor(8);
@@ -1066,27 +1066,27 @@ void MInterfaceRevan::TriggerStatistics()
 //         CSRGood->Fill(Analyzer.GetRawEvent()->GetScoreComptonQualityFactor1());
 //       }
 
-//       map<double, vector<MRESE*>, greater_equal<double> >& TestStatistics = 
+//       map<double, vector<MRESE*>, greater_equal<double> >& TestStatistics =
 //         CSR.GetTestStatistics();
 
 //       map<double, vector<MRESE*>, greater_equal<double> >::iterator TestStatisticsIterator;
 
-//       for (TestStatisticsIterator = TestStatistics.begin(); 
-//            TestStatisticsIterator != TestStatistics.end(); 
+//       for (TestStatisticsIterator = TestStatistics.begin();
+//            TestStatisticsIterator != TestStatistics.end();
 //            TestStatisticsIterator++) {
 //         CSRAll->Fill((*TestStatisticsIterator).first);
 //       }
-      
-//     }  
+
+//     }
 //   }
 
-//   TCanvas* CSRGoodCanvas = 
+//   TCanvas* CSRGoodCanvas =
 //     new TCanvas("CSR Test Good Statistics Canvas", "CSR Test Good Statistics Canvas", 640, 480);
 //   CSRGoodCanvas->cd();
 //   CSRGood->Draw();
 //   CSRGoodCanvas->Update();
 
-//   TCanvas* CSRAllCanvas = 
+//   TCanvas* CSRAllCanvas =
 //     new TCanvas("CSR Test All Statistics Canvas", "CSR Test All Statistics Canvas", 640, 480);
 //   CSRAllCanvas->cd();
 //   CSRAll->Draw();
@@ -1109,16 +1109,16 @@ void MInterfaceRevan::EnergyDistribution()
   double EMax = m_Data->GetTotalEnergyMax();
   double EMin = m_Data->GetTotalEnergyMin();
 
-  TH1D* Before = new TH1D("InitialEnergySpectrum", 
-        "Energy spectrum BEFORE reconstruction", 
+  TH1D* Before = new TH1D("InitialEnergySpectrum",
+        "Energy spectrum BEFORE reconstruction",
         NBins, EMin, EMax);
   Before->SetBit(kCanDelete);
   Before->SetFillColor(8);
   Before->GetXaxis()->SetTitle("Energy [keV]");
   Before->GetYaxis()->SetTitle("counts");
 
-  TH1D* After = new TH1D("InitialEnergySpectrum", 
-       "Energy spectrum AFTER reconstruction", 
+  TH1D* After = new TH1D("InitialEnergySpectrum",
+       "Energy spectrum AFTER reconstruction",
        NBins, EMin, EMax);
   After->SetBit(kCanDelete);
   After->SetFillColor(8);
@@ -1128,34 +1128,34 @@ void MInterfaceRevan::EnergyDistribution()
   MRawEventAnalyzer Analyzer;
   Analyzer.SetGeometry(m_Geometry);
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
-  
+
   SetGuiData(Analyzer);
   if (Analyzer.PreAnalysis() == false) return;
 
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
-    
+
     if (Analyzer.GetInitialRawEvent() != 0) {
       Before->Fill(Analyzer.GetInitialRawEvent()->GetEnergy());
-    } 
+    }
 
     if (Analyzer.GetOptimumEvent() != 0) {
       After->Fill(Analyzer.GetOptimumEvent()->GetEnergy());
     }
-    
+
   } while (true);
 
   if (Analyzer.PostAnalysis() == false) return;
-  
+
   TCanvas* BeforeCanvas = new TCanvas("Before", "Before", 640, 480);
   BeforeCanvas->cd();
   Before->Draw();
   BeforeCanvas->Update();
-  
+
   TCanvas* AfterCanvas = new TCanvas("After", "After", 640, 480);
   AfterCanvas->cd();
   After->Draw();
@@ -1194,7 +1194,7 @@ void MInterfaceRevan::InitialEventStatistics()
   // Set up a dummy clusterizer
   MERClusterize Clusterizer;
   if (m_Data->GetClusteringAlgorithm() == MRawEventAnalyzer::c_ClusteringAlgoDistance) {
-    Clusterizer.SetParameters(m_Data->GetStandardClusterizerMinDistanceD1(), 
+    Clusterizer.SetParameters(m_Data->GetStandardClusterizerMinDistanceD1(),
                               m_Data->GetStandardClusterizerMinDistanceD2(),
                               m_Data->GetStandardClusterizerMinDistanceD3(),
                               m_Data->GetStandardClusterizerMinDistanceD4(),
@@ -1213,8 +1213,8 @@ void MInterfaceRevan::InitialEventStatistics()
     unsigned int NHits = RE->GetNRESEs();
     if (NHits < MaxHits) {
       if (MaxFoundHits < NHits) MaxFoundHits = NHits;
-      Hits[NHits]++;    
-    }    
+      Hits[NHits]++;
+    }
     ++NEvents;
     AverageEnergy += RE->GetEnergy();
 
@@ -1226,7 +1226,7 @@ void MInterfaceRevan::InitialEventStatistics()
       if (MaxFoundSeparatedHits < NSeparatedHits) MaxFoundSeparatedHits = NSeparatedHits;
       SeparatedHits[NSeparatedHits]++;
       NSeparatedHitsEvents++;
-    }    
+    }
 
     // delete RE; --> delete by RawEvents
   }
@@ -1297,11 +1297,11 @@ void MInterfaceRevan::HitStatistics()
 
    unsigned int ind = 0;
 
-//   while ((RE = Reader->GetNextEvent()) != 0) { 
+//   while ((RE = Reader->GetNextEvent()) != 0) {
 
   MERClusterize Clusterizer;
   if (m_Data->GetClusteringAlgorithm() == MRawEventAnalyzer::c_ClusteringAlgoDistance) {
-    Clusterizer.SetParameters(m_Data->GetStandardClusterizerMinDistanceD1(), 
+    Clusterizer.SetParameters(m_Data->GetStandardClusterizerMinDistanceD1(),
                               m_Data->GetStandardClusterizerMinDistanceD2(),
                               m_Data->GetStandardClusterizerMinDistanceD3(),
                               m_Data->GetStandardClusterizerMinDistanceD4(),
@@ -1317,18 +1317,18 @@ void MInterfaceRevan::HitStatistics()
   MRERawEvent* RE = 0;
   MRawEventList* RawEvents = new MRawEventList(0);
 
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     RawEvents->SetInitialRawEvent(RE);
     Clusterizer.Analyze(RawEvents);
-  
+
     massert(RawEvents->GetNRawEvents() == 1);
-    
+
     MRERawEvent* RW = RawEvents->GetRawEventAt(0);
 
     for (int i = 0; i < RW->GetNRESEs(); ++i) {
       RESE = RW->GetRESEAt(i);
       Detector = RESE->GetVolumeSequence()->GetDetector()->GetName();
-      
+
       for (ind = 0; ind < DetectorNames.size(); ++ind) {
         if (DetectorNames[ind] == Detector) break;
       }
@@ -1378,7 +1378,7 @@ void MInterfaceRevan::HitStatistics()
   map<MString, int>::iterator Iter;
   map<MString, double> DetectorEfficiency;
   map<MString, double>::iterator EIter;
-  
+
   MFileEventsEvta* Reader = new MFileEventsEvta(m_Geometry);
   if (Reader->Open(m_Data->GetCurrentFileName()) == false) {
     mout<<"Unable to open file "<<m_Data->GetCurrentFileName()<<". Aborting!"<<endl;
@@ -1391,7 +1391,7 @@ void MInterfaceRevan::HitStatistics()
   MRERawEvent* RE = 0;
   MString Detector;
 
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     if (RE->GetNRESEs() != 1) continue;
     for (int i = 0; i < RE->GetNRESEs(); ++i) {
       RESE = RE->GetRESEAt(i);
@@ -1399,7 +1399,7 @@ void MInterfaceRevan::HitStatistics()
       if (RESE->GetEnergy() < MaxEnergy && RESE->GetEnergy() > MinEnergy) {
         Detector = m_Geometry->GetDetectorName(Pos);
         DetectorHits[Detector]++;
-      }    
+      }
     }
     delete RE;
   }
@@ -1407,7 +1407,7 @@ void MInterfaceRevan::HitStatistics()
   cout<<"Hits per detector up to "<<setw(6)<<MaxEnergy<<"keV:"<<endl;
   for (Iter = DetectorHits.begin(); Iter != DetectorHits.end(); Iter++) {
     cout<<setw(13)<<(*Iter).first<<": "<<setw(6)<<(*Iter).second<<" hits"<<endl;
-  }  
+  }
 
   int SumD1 = 0;
   int SumD22 = 0;
@@ -1415,13 +1415,13 @@ void MInterfaceRevan::HitStatistics()
   int SumD28 = 0;
   for (Iter = DetectorHits.begin(); Iter != DetectorHits.end(); Iter++) {
     MString Name = (*Iter).first;
-    if (Name == "athene" || Name == "daphne" || 
+    if (Name == "athene" || Name == "daphne" ||
         Name == "xantippe" || Name == "aphrodite") {
       SumD28 += (*Iter).second;
     } else if (Name == "medusa" || Name == "fortuna" || Name == "penelope" || Name == "venus" ||
          Name == "hydra" || Name == "aetna" || Name == "ariadne" || Name == "helena") {
       SumD24 += (*Iter).second;
-    } else if (Name == "antigone" || Name == "diane" || Name == "persephone" || Name == "minerva" || 
+    } else if (Name == "antigone" || Name == "diane" || Name == "persephone" || Name == "minerva" ||
          Name == "pallas" || Name == "thetis" || Name == "circe" || Name == "europa") {
       SumD22 += (*Iter).second;
     } else {
@@ -1431,25 +1431,25 @@ void MInterfaceRevan::HitStatistics()
 
   for (Iter = DetectorHits.begin(); Iter != DetectorHits.end(); Iter++) {
     MString Name = (*Iter).first;
-    if (Name == "athene" || Name == "daphne" || 
+    if (Name == "athene" || Name == "daphne" ||
         Name == "xantippe" || Name == "aphrodite") {
       DetectorEfficiency[Name] = 4.0*(*Iter).second/SumD28;
     } else if (Name == "medusa" || Name == "fortuna" || Name == "penelope" || Name == "venus" ||
          Name == "hydra" || Name == "aetna" || Name == "ariadne" || Name == "helena") {
       DetectorEfficiency[Name] = 8.0*(*Iter).second/SumD24;
-    } else if (Name == "antigone" || Name == "diane" || Name == "persephone" || Name == "minerva" || 
+    } else if (Name == "antigone" || Name == "diane" || Name == "persephone" || Name == "minerva" ||
          Name == "pallas" || Name == "thetis" || Name == "circe" || Name == "europa") {
       DetectorEfficiency[Name] = 8.0*(*Iter).second/SumD22;
     } else {
       DetectorEfficiency[Name] = 11.0*(*Iter).second/SumD1;
     }
-  }  
+  }
 
   cout<<"  // Efficiency between "<<MinEnergy<<"keV and "<<MaxEnergy<<"keV:"<<endl;
   for (EIter = DetectorEfficiency.begin(); EIter != DetectorEfficiency.end(); EIter++) {
     //cout<<setw(13)<<(*EIter).first<<": "<<setw(6)<<(*EIter).second<<endl;
     cout<<"  m_Efficiency[\""<<(*EIter).first<<"\"] = "<<(*EIter).second<<";"<<endl;
-  }  
+  }
 }
 */
 
@@ -1473,6 +1473,7 @@ void MInterfaceRevan::DetectorTypeClusterDistribution(bool Before)
   SetGuiData(Analyzer);
   if (Before == true) {
     Analyzer.SetTrackingAlgorithm(MRawEventAnalyzer::c_TrackingAlgoNone);
+    Analyzer.SetPairAlgorithm(MRawEventAnalyzer::c_PairKalman2D);
     Analyzer.SetCSRAlgorithm(MRawEventAnalyzer::c_CSRAlgoNone);
     Analyzer.SetDecayAlgorithm(MRawEventAnalyzer::c_DecayAlgoNone);
   }
@@ -1486,10 +1487,10 @@ void MInterfaceRevan::DetectorTypeClusterDistribution(bool Before)
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
-    
+
     if (Before == true) {
       RE = Analyzer.GetBestTryEvent();
     } else {
@@ -1503,7 +1504,7 @@ void MInterfaceRevan::DetectorTypeClusterDistribution(bool Before)
           // Split top-level tracks:
           Track = dynamic_cast<MRETrack*>(RESE);
           for (int h = 0; h < Track->GetNRESEs(); ++h) {
-            Hits[Track->GetRESEAt(h)->GetDetector()]++;            
+            Hits[Track->GetRESEAt(h)->GetDetector()]++;
           }
         } else {
           Hits[RESE->GetDetector()]++;
@@ -1541,9 +1542,9 @@ void MInterfaceRevan::DetectorTypeClusterDistribution(bool Before)
   // To screen...
   for (map<int, vector<unsigned int> >::iterator Iter = ClusterDistribution.begin();
        Iter != ClusterDistribution.end(); ++Iter) {
-    TH1D* Clusters = new TH1D(MString("ClusterDistribution") + 
+    TH1D* Clusters = new TH1D(MString("ClusterDistribution") +
                               MDDetector::GetDetectorTypeName((*Iter).first) + SuffixName,
-                              MString("Cluster Distribution in Detector Type ") + 
+                              MString("Cluster Distribution in Detector Type ") +
                               MDDetector::GetDetectorTypeName((*Iter).first) + SuffixTitle,
                               (*Iter).second.size(), 0.5, (*Iter).second.size()+0.5);
     Clusters->SetBit(kCanDelete);
@@ -1555,10 +1556,10 @@ void MInterfaceRevan::DetectorTypeClusterDistribution(bool Before)
       Clusters->SetBinContent(b, (*Iter).second[b]);
     }
 
-    TCanvas* ClustersCanvas = 
-      new TCanvas(MString("CanvasClusterDistribution") + 
+    TCanvas* ClustersCanvas =
+      new TCanvas(MString("CanvasClusterDistribution") +
                   MDDetector::GetDetectorTypeName((*Iter).first) + SuffixName,
-                  MString("Canvas for Cluster Distribution in Detector Type ") + 
+                  MString("Canvas for Cluster Distribution in Detector Type ") +
                   MDDetector::GetDetectorTypeName((*Iter).first) + SuffixTitle);
     ClustersCanvas->cd();
     Clusters->Draw();
@@ -1588,6 +1589,7 @@ void MInterfaceRevan::DetectorTypeHitDistribution(bool Before)
   SetGuiData(Analyzer);
   if (Before == true) {
     Analyzer.SetTrackingAlgorithm(MRawEventAnalyzer::c_TrackingAlgoNone);
+    Analyzer.SetPairAlgorithm(MRawEventAnalyzer::c_PairKalman2D);
     Analyzer.SetCSRAlgorithm(MRawEventAnalyzer::c_CSRAlgoNone);
     Analyzer.SetDecayAlgorithm(MRawEventAnalyzer::c_DecayAlgoNone);
   }
@@ -1602,10 +1604,10 @@ void MInterfaceRevan::DetectorTypeHitDistribution(bool Before)
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
-    
+
     if (Before == true) {
       RE = Analyzer.GetBestTryEvent();
     } else {
@@ -1623,17 +1625,17 @@ void MInterfaceRevan::DetectorTypeHitDistribution(bool Before)
               // Split second-level clusters:
               Cluster = dynamic_cast<MRECluster*>(RESE);
               for (int h = 0; h < Cluster->GetNRESEs(); ++h) {
-                Hits[Cluster->GetRESEAt(h)->GetDetector()]++;            
+                Hits[Cluster->GetRESEAt(h)->GetDetector()]++;
               }
             } else {
-              Hits[Track->GetRESEAt(h)->GetDetector()]++;  
+              Hits[Track->GetRESEAt(h)->GetDetector()]++;
             }
           }
         } else if (RESE->GetType() == MRESE::c_Cluster) {
           // Split top-level clusters:
           Cluster = dynamic_cast<MRECluster*>(RESE);
           for (int h = 0; h < Cluster->GetNRESEs(); ++h) {
-            Hits[Cluster->GetRESEAt(h)->GetDetector()]++;            
+            Hits[Cluster->GetRESEAt(h)->GetDetector()]++;
           }
         } else {
           Hits[RESE->GetDetector()]++;
@@ -1671,9 +1673,9 @@ void MInterfaceRevan::DetectorTypeHitDistribution(bool Before)
   // To screen...
   for (map<int, vector<unsigned int> >::iterator Iter = HitDistribution.begin();
        Iter != HitDistribution.end(); ++Iter) {
-    TH1D* Hits = new TH1D(MString("HitDistribution") + 
+    TH1D* Hits = new TH1D(MString("HitDistribution") +
                               MDDetector::GetDetectorTypeName((*Iter).first) + SuffixName,
-                              MString("Hit Distribution in Detector Type ") + 
+                              MString("Hit Distribution in Detector Type ") +
                               MDDetector::GetDetectorTypeName((*Iter).first) + SuffixTitle,
                               (*Iter).second.size(), 0.5, (*Iter).second.size()+0.5);
     Hits->SetBit(kCanDelete);
@@ -1685,10 +1687,10 @@ void MInterfaceRevan::DetectorTypeHitDistribution(bool Before)
       Hits->SetBinContent(b, (*Iter).second[b]);
     }
 
-    TCanvas* HitsCanvas = 
-      new TCanvas(MString("CanvasHitDistribution") + 
+    TCanvas* HitsCanvas =
+      new TCanvas(MString("CanvasHitDistribution") +
                   MDDetector::GetDetectorTypeName((*Iter).first) + SuffixName,
-                  MString("Canvas for Hit Distribution in Detector Type ") + 
+                  MString("Canvas for Hit Distribution in Detector Type ") +
                   MDDetector::GetDetectorTypeName((*Iter).first) + SuffixTitle);
     HitsCanvas->cd();
     Hits->Draw();
@@ -1720,21 +1722,21 @@ void MInterfaceRevan::DepthProfileByDetector()
   double MaxTotalEnergy = m_Data->GetTotalEnergyMax();
 
   // Since we do not know anything about the detectors we have to store the events by detector first:
-  
+
   // Map the detector center to a vector of depths
   map<MVector, vector<double>> Depths;
-  
+
   // Step 1: Accumulate all hits:
 
   MRERawEvent* RE = 0;
   while ((RE = Reader->GetNextEvent()) != 0) {
-    
+
     // Make sure the total energy is right:
     double Total = 0;
     for (int i = 0; i < RE->GetNRESEs(); ++i) {
       Total += RE->GetRESEAt(i)->GetEnergy();
     }
-    if (Total >= MinTotalEnergy && Total <= MaxTotalEnergy) { 
+    if (Total >= MinTotalEnergy && Total <= MaxTotalEnergy) {
       // Save positions and energies
       for (int i = 0; i < RE->GetNRESEs(); ++i) {
         MDVolumeSequence* V = RE->GetRESEAt(i)->GetVolumeSequence();
@@ -1745,10 +1747,10 @@ void MInterfaceRevan::DepthProfileByDetector()
         }
       }
     }
-    
+
     delete RE;
   }
-  
+
   // Step 2: Show everything:
   for (auto& Pair: Depths) {
     MString Title;
@@ -1765,7 +1767,7 @@ void MInterfaceRevan::DepthProfileByDetector()
         for (double N: Pair.second) {
           if (N < Min) Min = N;
           if (N > Max) Max = N;
-        }         
+        }
       }
     } else {
       Title = Pair.first.ToString();
@@ -1774,21 +1776,21 @@ void MInterfaceRevan::DepthProfileByDetector()
         if (N > Max) Max = N;
       }
     }
-    
+
     TH1D* Hist = new TH1D(Title, Title, 100, Min, Max);
     Hist->SetXTitle("Interaction depth [cm]");
     Hist->SetYTitle("counts");
     for (double N: Pair.second) {
-      Hist->Fill(N);    
+      Hist->Fill(N);
     }
-    
+
     TCanvas* Canvas = new TCanvas();
     Canvas->cd();
     Hist->Draw();
     Canvas->Update();
   }
-  
-  
+
+
 }
 
 
@@ -1814,26 +1816,26 @@ void MInterfaceRevan::SpatialDistribution(bool UseEnergy)
 
   double MinTotalEnergy = m_Data->GetTotalEnergyMin();
   double MaxTotalEnergy = m_Data->GetTotalEnergyMax();
-  
+
   // Step 1: Accumulate many, many hits:
 
   MRESE* RESE = 0;
   MRERawEvent* RE = 0;
   while ((RE = Reader->GetNextEvent()) != 0) {
-    
+
     // Make sure the total energy is right:
     double Total = 0;
     for (int i = 0; i < RE->GetNRESEs(); ++i) {
       Total += RE->GetRESEAt(i)->GetEnergy();
     }
-    if (Total >= MinTotalEnergy && Total <= MaxTotalEnergy) { 
+    if (Total >= MinTotalEnergy && Total <= MaxTotalEnergy) {
       // Save positions and energies
       for (int i = 0; i < RE->GetNRESEs(); ++i) {
         Positions.push_back(RE->GetRESEAt(i)->GetPosition());
         Energies.push_back(RE->GetRESEAt(i)->GetEnergy());
       }
     }
-    
+
     delete RE;
 
     if (Positions.size() > MaxNPositions) {
@@ -1866,18 +1868,18 @@ void MInterfaceRevan::SpatialDistribution(bool UseEnergy)
     ValueAxisTitle = "Counts per bin";
   }
 
-  TH3D* xyzHist = new TH3D(HistName + "xyz", 
-                           HistTitle + "xyz", 
+  TH3D* xyzHist = new TH3D(HistName + "xyz",
+                           HistTitle + "xyz",
                            MaxNBins, xMin, xMax,
-                           MaxNBins, yMin, yMax, 
+                           MaxNBins, yMin, yMax,
                            MaxNBins, zMin, zMax);
   xyzHist->SetBit(kCanDelete);
   xyzHist->GetXaxis()->SetTitle("x [cm]");
   xyzHist->GetYaxis()->SetTitle("y [cm]");
   xyzHist->GetZaxis()->SetTitle("z [cm]");
 
-  TH2D* xyHist = new TH2D(HistName + "xy", 
-                          HistTitle + "xy", 
+  TH2D* xyHist = new TH2D(HistName + "xy",
+                          HistTitle + "xy",
                           MaxNBins, xMin, xMax,
                           MaxNBins, yMin, yMax);
   xyHist->SetBit(kCanDelete);
@@ -1885,8 +1887,8 @@ void MInterfaceRevan::SpatialDistribution(bool UseEnergy)
   xyHist->GetYaxis()->SetTitle("y [cm]");
   xyHist->GetZaxis()->SetTitle(ValueAxisTitle);
 
-  TH2D* xzHist = new TH2D(HistName + "xz", 
-                          HistTitle + "xz", 
+  TH2D* xzHist = new TH2D(HistName + "xz",
+                          HistTitle + "xz",
                           MaxNBins, xMin, xMax,
                           MaxNBins, zMin, zMax);
   xzHist->SetBit(kCanDelete);
@@ -1894,8 +1896,8 @@ void MInterfaceRevan::SpatialDistribution(bool UseEnergy)
   xzHist->GetYaxis()->SetTitle("z [cm]");
   xzHist->GetZaxis()->SetTitle(ValueAxisTitle);
 
-  TH2D* yzHist = new TH2D(HistName + "yz", 
-                          HistTitle + "yz", 
+  TH2D* yzHist = new TH2D(HistName + "yz",
+                          HistTitle + "yz",
                           MaxNBins, yMin, yMax,
                           MaxNBins, zMin, zMax);
   yzHist->SetBit(kCanDelete);
@@ -1903,22 +1905,22 @@ void MInterfaceRevan::SpatialDistribution(bool UseEnergy)
   yzHist->GetYaxis()->SetTitle("z [cm]");
   yzHist->GetZaxis()->SetTitle(ValueAxisTitle);
 
-  TH1D* xHist = new TH1D(HistName + "x", 
-                         HistTitle + "x", 
+  TH1D* xHist = new TH1D(HistName + "x",
+                         HistTitle + "x",
                          MaxNBins, xMin, xMax);
   xHist->SetBit(kCanDelete);
   xHist->GetXaxis()->SetTitle("x [cm]");
   xHist->GetYaxis()->SetTitle(ValueAxisTitle);
 
-  TH1D* yHist = new TH1D(HistName + "y", 
-                         HistTitle + "y", 
+  TH1D* yHist = new TH1D(HistName + "y",
+                         HistTitle + "y",
                          MaxNBins, yMin, yMax);
   yHist->SetBit(kCanDelete);
   yHist->GetXaxis()->SetTitle("y [cm]");
   yHist->GetYaxis()->SetTitle(ValueAxisTitle);
 
-  TH1D* zHist = new TH1D(HistName + "z", 
-                         HistTitle + "z", 
+  TH1D* zHist = new TH1D(HistName + "z",
+                         HistTitle + "z",
                          MaxNBins, zMin, zMax);
   zHist->SetBit(kCanDelete);
   zHist->GetXaxis()->SetTitle("z [cm]");
@@ -1945,7 +1947,7 @@ void MInterfaceRevan::SpatialDistribution(bool UseEnergy)
 
   // Step 4: Continue filling from file:
 
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     for (int i = 0; i < RE->GetNRESEs(); ++i) {
       RESE = RE->GetRESEAt(i);
       Pos = RESE->GetPosition();
@@ -2051,7 +2053,7 @@ void MInterfaceRevan::EnergyPerDetector()
   MVector Pos;
   MRESE* RESE = 0;
   MRERawEvent* RE = 0;
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     // categorize the beam into layers:
 
     int NHitsD1 = 0;
@@ -2065,7 +2067,7 @@ void MInterfaceRevan::EnergyPerDetector()
       }
     }
 
-    if (RE->GetEnergy() > Emax || 
+    if (RE->GetEnergy() > Emax ||
   //if (RE->GetEnergy() > 1.1*Emax || RE->GetEnergy() < 0.9*Emax ||
         NHitsD1 == 0 || NHitsD2 == 0) {
       delete RE;
@@ -2083,12 +2085,12 @@ void MInterfaceRevan::EnergyPerDetector()
         AvgEnergyD2 += RESE->GetEnergy();
       }
     }
-    
+
 
     bool HitD2side = false;
     bool HitD2bottom = false;
     for (int i = 0; i < RE->GetNRESEs(); ++i) {
-      RESE = RE->GetRESEAt(i); 
+      RESE = RE->GetRESEAt(i);
       if (RESE->GetDetector() == 1) {
         D1Hist->Fill(RESE->GetEnergy());
       } else if (RESE->GetDetector() == 2) {
@@ -2191,48 +2193,48 @@ void MInterfaceRevan::EnergyPerCentralTrackElement()
   double EMin = 100;
   double EMax = 1000;
 
-  TH1D* StartEnergy = new TH1D("StartEnergySpectrum", 
-                                 "Energy of start track element", 
+  TH1D* StartEnergy = new TH1D("StartEnergySpectrum",
+                                 "Energy of start track element",
                                  NBins/2, EMin, EMax);
   StartEnergy->SetBit(kCanDelete);
   StartEnergy->SetFillColor(8);
   StartEnergy->GetXaxis()->SetTitle("Energy [keV]");
   StartEnergy->GetYaxis()->SetTitle("counts");
 
-  TH1D* StartAngle = new TH1D("StartAngleDstribution", 
-                                "Angle of start track element", 
+  TH1D* StartAngle = new TH1D("StartAngleDstribution",
+                                "Angle of start track element",
                                 90, 0, 180);
   StartAngle->SetBit(kCanDelete);
   StartAngle->SetFillColor(8);
   StartAngle->GetXaxis()->SetTitle("Angle [#circ]");
   StartAngle->GetYaxis()->SetTitle("counts");
 
-  TH1D* CentralEnergy = new TH1D("CentralEnergySpectrum", 
-                                 "Energy of central track element", 
+  TH1D* CentralEnergy = new TH1D("CentralEnergySpectrum",
+                                 "Energy of central track element",
                                  NBins, EMin, EMax);
   CentralEnergy->SetBit(kCanDelete);
   CentralEnergy->SetFillColor(8);
   CentralEnergy->GetXaxis()->SetTitle("Energy [keV]");
   CentralEnergy->GetYaxis()->SetTitle("counts");
 
-  TH1D* CentralAngle = new TH1D("CentralAngleDstribution", 
-                                "Angle of central track element", 
+  TH1D* CentralAngle = new TH1D("CentralAngleDstribution",
+                                "Angle of central track element",
                                 90, 0, 180);
   CentralAngle->SetBit(kCanDelete);
   CentralAngle->SetFillColor(8);
   CentralAngle->GetXaxis()->SetTitle("Angle [#circ]");
   CentralAngle->GetYaxis()->SetTitle("counts");
 
-  TH1D* StopEnergy = new TH1D("StopEnergySpectrum", 
-                                 "Energy of stop track element", 
+  TH1D* StopEnergy = new TH1D("StopEnergySpectrum",
+                                 "Energy of stop track element",
                                  NBins, EMin, EMax);
   StopEnergy->SetBit(kCanDelete);
   StopEnergy->SetFillColor(8);
   StopEnergy->GetXaxis()->SetTitle("Energy [keV]");
   StopEnergy->GetYaxis()->SetTitle("counts");
 
-  TH1D* StopAngle = new TH1D("StopAngleDstribution", 
-                                "Angle of stop track element", 
+  TH1D* StopAngle = new TH1D("StopAngleDstribution",
+                                "Angle of stop track element",
                                 90, 0, 180);
   StopAngle->SetBit(kCanDelete);
   StopAngle->SetFillColor(8);
@@ -2250,10 +2252,10 @@ void MInterfaceRevan::EnergyPerCentralTrackElement()
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
-    
+
     if (Analyzer.GetOptimumEvent() != 0) {
       MRERawEvent* RE = Analyzer.GetOptimumEvent();
       for (int h = 0; h < RE->GetNRESEs(); ++h) {
@@ -2276,32 +2278,32 @@ void MInterfaceRevan::EnergyPerCentralTrackElement()
   } while (true);
 
   if (Analyzer.PostAnalysis() == false) return;
-  
+
   TCanvas* StartEnergyCanvas = new TCanvas("StartEnergy", "StartEnergy", 640, 480);
   StartEnergyCanvas->cd();
   StartEnergy->Draw();
   StartEnergyCanvas->Update();
-  
+
   TCanvas* StartAngleCanvas = new TCanvas("StartAngle", "StartAngle", 640, 480);
   StartAngleCanvas->cd();
   StartAngle->Draw();
   StartAngleCanvas->Update();
-  
+
   TCanvas* CentralEnergyCanvas = new TCanvas("CentralEnergy", "CentralEnergy", 640, 480);
   CentralEnergyCanvas->cd();
   CentralEnergy->Draw();
   CentralEnergyCanvas->Update();
-  
+
   TCanvas* CentralAngleCanvas = new TCanvas("CentralAngle", "CentralAngle", 640, 480);
   CentralAngleCanvas->cd();
   CentralAngle->Draw();
   CentralAngleCanvas->Update();
-  
+
   TCanvas* StopEnergyCanvas = new TCanvas("StopEnergy", "StopEnergy", 640, 480);
   StopEnergyCanvas->cd();
   StopEnergy->Draw();
   StopEnergyCanvas->Update();
-  
+
   TCanvas* StopAngleCanvas = new TCanvas("StopAngle", "StopAngle", 640, 480);
   StopAngleCanvas->cd();
   StopAngle->Draw();
@@ -2351,7 +2353,7 @@ void MInterfaceRevan::FindPolarization()
   double MaxGammaEnergy = 100000;
 
 
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     // categorize the beam into layers:
 
     NEvents++;
@@ -2376,7 +2378,7 @@ void MInterfaceRevan::FindPolarization()
       } // Energy
     } // Number of RESE
     delete RE;
-  }  
+  }
 
   TCanvas* Canvas = new TCanvas();
   Hist->Draw("lego2");
@@ -2413,19 +2415,19 @@ void MInterfaceRevan::StartDistribution()
   double eMin = 0;
   double eMax = 700;
 
-  TH1D* DOM = new TH1D("DOM", "DOM", NBins, 0, 180); 
+  TH1D* DOM = new TH1D("DOM", "DOM", NBins, 0, 180);
   DOM->SetBit(kCanDelete);
 
-  TH1D* EFirst = new TH1D("EFirst", "EFirst", NBins, eMin, eMax); 
+  TH1D* EFirst = new TH1D("EFirst", "EFirst", NBins, eMin, eMax);
   EFirst->SetBit(kCanDelete);
   TH1D* ESecond = new TH1D("ESecond", "ESecond", NBins, eMin, eMax);
   ESecond->SetBit(kCanDelete);
   TH1D* EThird = new TH1D("EThird", "EThird", NBins, eMin, eMax);
   EThird->SetBit(kCanDelete);
 
-  TH2D* Double = new TH2D("Double", "Double", NBins, xMin, xMax, NBins, yMin, yMax); 
+  TH2D* Double = new TH2D("Double", "Double", NBins, xMin, xMax, NBins, yMin, yMax);
   Double->SetBit(kCanDelete);
-  TH2D* Triple = new TH2D("Triple+", "Triple+", NBins, xMin, xMax, NBins, yMin, yMax); 
+  TH2D* Triple = new TH2D("Triple+", "Triple+", NBins, xMin, xMax, NBins, yMin, yMax);
   Triple->SetBit(kCanDelete);
 
 
@@ -2433,12 +2435,12 @@ void MInterfaceRevan::StartDistribution()
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
 
     if ((RE = Analyzer.GetInitialRawEvent()) != 0) {
-      
+
       cout<<"Number: "<<RE->GetNRESEs()<<endl;
       if (RE->GetNRESEs() == 2) {
         if (RE->GetRESEAt(0)->GetPosition().Z() == 24.720 &&
@@ -2451,9 +2453,9 @@ void MInterfaceRevan::StartDistribution()
         if (RE->GetRESEAt(0)->GetPosition().Z() == 24.720 &&
             RE->GetRESEAt(1)->GetPosition().Z() == 23.720 &&
             RE->GetRESEAt(2)->GetPosition().Z() == 22.720 &&
-            RE->GetRESEAt(0)->GetPosition().X() > -3 && 
-            RE->GetRESEAt(0)->GetPosition().X() < 3 && 
-            RE->GetRESEAt(0)->GetPosition().Y() > -3 && 
+            RE->GetRESEAt(0)->GetPosition().X() > -3 &&
+            RE->GetRESEAt(0)->GetPosition().X() < 3 &&
+            RE->GetRESEAt(0)->GetPosition().Y() > -3 &&
             RE->GetRESEAt(0)->GetPosition().Y() < 3 ) {
           Triple->Fill(RE->GetRESEAt(0)->GetPosition().X(), RE->GetRESEAt(0)->GetPosition().Y(), 1);
           REA = Analyzer.GetOptimumEvent();
@@ -2482,7 +2484,7 @@ void MInterfaceRevan::StartDistribution()
   DOMCanvas->cd();
   DOM->Draw();
   cout<<" < 90: "<<DOM->Integral(0, NBins/2)<<"   > 90: "<<DOM->Integral(NBins/2+1, NBins)<<endl;
-   
+
   //   TCanvas* DoubleCanvas = new TCanvas();
   //   Double->Draw();
 
@@ -2490,17 +2492,17 @@ void MInterfaceRevan::StartDistribution()
   //   Triple->Draw();
 
   TCanvas* EFirstCanvas = new TCanvas();
-  EFirstCanvas->cd();  
+  EFirstCanvas->cd();
   EFirst->Draw();
 
   TCanvas* ESecondCanvas = new TCanvas();
-  ESecondCanvas->cd();  
+  ESecondCanvas->cd();
   ESecond->Draw();
 
   TCanvas* EThirdCanvas = new TCanvas();
-  EThirdCanvas->cd();  
+  EThirdCanvas->cd();
   EThird->Draw();
-  
+
   return;
 }
 
@@ -2512,7 +2514,7 @@ void MInterfaceRevan::FindBeamPath()
 {
   if (IsInitialized() == false) return;
 
-  // 
+  //
 
   int Number = 3;
   double Stops[3] = { 0.00, 0.50, 1.00 };
@@ -2529,7 +2531,7 @@ void MInterfaceRevan::FindBeamPath()
   Reader->ShowProgress(m_UseGui);
 
   // Create a list of histograms:
-  vector<double> zValues; 
+  vector<double> zValues;
   vector<TH2D*> Histos;
   vector<TCanvas*> Canvases;
 
@@ -2550,7 +2552,7 @@ void MInterfaceRevan::FindBeamPath()
   int NEvents = 0;
   MRESE* R;
   MRERawEvent* RE = 0;
-  while ((RE = Reader->GetNextEvent()) != 0) { 
+  while ((RE = Reader->GetNextEvent()) != 0) {
     EventUsed = false;
     // categorize the beam into layers:
     for (int r = 0; r < RE->GetNRESEs(); ++r) {
@@ -2566,7 +2568,7 @@ void MInterfaceRevan::FindBeamPath()
     }
     if (EventUsed == true) NEvents++;
     delete RE;
-  }  
+  }
 
 
   // Show the histograms:
@@ -2575,7 +2577,7 @@ void MInterfaceRevan::FindBeamPath()
     Histos[l]->Draw("colz");
     Canvases [l]->Update();
   }
-  
+
   // Now do a fit to determine the path
   TGraph* PathX = new TGraph(Layers);
   for (unsigned int l = 0; l < Layers; ++l) {
@@ -2588,7 +2590,7 @@ void MInterfaceRevan::FindBeamPath()
   PathX->SetMarkerStyle(3);
   PathX->Draw("AP");
   PathXCanvas->Update();
-  
+
   TGraph* PathY = new TGraph(Layers);
   for (unsigned int l = 0; l < Layers; ++l) {
     PathY->SetPoint(l, zValues[l], Histos[l]->GetMean(2));
@@ -2616,7 +2618,7 @@ void MInterfaceRevan::FindBeamPath()
   ProfileCanvas->cd();
   Profile->Draw();
   ProfileCanvas->Update();
-  
+
   cout<<"Number of used events: "<<NEvents<<endl;
 
 
@@ -2649,18 +2651,19 @@ void MInterfaceRevan::NumberOfClusters()
   if (Analyzer.SetInputModeFile(m_Data->GetCurrentFileName()) == false) return;
   SetGuiData(Analyzer);
   Analyzer.SetTrackingAlgorithm(MRawEventAnalyzer::c_TrackingAlgoNone);
+  Analyzer.SetPairAlgorithm(MRawEventAnalyzer::c_PairKalman2D);
   Analyzer.SetCSRAlgorithm(MRawEventAnalyzer::c_CSRAlgoNone);
   Analyzer.SetDecayAlgorithm(MRawEventAnalyzer::c_DecayAlgoNone);
 
   if (Analyzer.PreAnalysis() == false) return;
 
   MRERawEvent* RE = 0;
-  
+
   unsigned int ReturnCode;
   do {
     ReturnCode = Analyzer.AnalyzeEvent();
-    
-    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile || 
+
+    if (ReturnCode == MRawEventAnalyzer::c_AnalysisNoEventsLeftInFile ||
         ReturnCode == MRawEventAnalyzer::c_AnalysisSavingEventFailed) break;
 
     if ((RE = Analyzer.GetBestTryEvent()) != 0) {
@@ -2672,7 +2675,7 @@ void MInterfaceRevan::NumberOfClusters()
     // delete RE; // ?????
   } while (true);
 
-  TH1D* ClustersHist = 
+  TH1D* ClustersHist =
     new TH1D("NumberOfClustersPerEvent",
              "Number of Cluster per Event",
              Clusters.size(), 0.5, Clusters.size()+0.5);
@@ -2684,8 +2687,8 @@ void MInterfaceRevan::NumberOfClusters()
   for (int b = 0; b < ClustersHist->GetNbinsX(); ++b) {
     ClustersHist->SetBinContent(b, Clusters[b]);
   }
-  
-  TCanvas* ClustersCanvas = 
+
+  TCanvas* ClustersCanvas =
     new TCanvas("CanvasNumberOfClustersPerEvent",
                 "Canvas for Number of Cluster per event");
   ClustersCanvas->cd();
