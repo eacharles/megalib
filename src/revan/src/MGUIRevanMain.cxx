@@ -58,9 +58,7 @@ ClassImp(MGUIRevanMain)
 MGUIRevanMain::MGUIRevanMain(MInterfaceRevan* Interface, MSettingsRevan* Data)
   : MGUIMain(660, 270, Interface, Data)
 {
-  m_Interface = new MInterfaceRevan();
   m_Interface = Interface;
-  m_Data = new MSettingsRevan();
   m_Data = Data;
 }
 

@@ -1,7 +1,7 @@
 /*
  * MERTrackKalman3D.h
  *
- * Copyright (C) by Mark Polsen & Andreas Zoglauer.
+ * Copyright (C) by Paolo Cumani & Andreas Zoglauer.
  * All rights reserved.
  *
  * Please see the source-file for the copyright-notice.

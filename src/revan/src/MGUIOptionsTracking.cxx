@@ -53,8 +53,6 @@ MGUIOptionsTracking::MGUIOptionsTracking(const TGWindow* Parent,
   : MGUIDialog(Parent, Main)
 {
   // Construct an instance of MGUIOptionsTracking and bring it to the screen
-  m_Data = new MSettingsEventReconstruction();
-  m_Geometry = new MDGeometryQuest();
   m_Data = Data;
   m_Geometry = Geometry;
 

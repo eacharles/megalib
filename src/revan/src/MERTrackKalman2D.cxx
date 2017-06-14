@@ -2,7 +2,7 @@
 * MERTrackKalman2D.cxx
 *
 *
-* Copyright (C) by Andreas Zoglauer.
+* Copyright (C) by Paolo Cumani & Andreas Zoglauer.
 * All rights reserved.
 *
 *
@@ -693,13 +693,16 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
       Electron->SetEnergy(E1*1000); //So far the energy was calculated in MeV, MEGAlib works in keV
       Positron->SetEnergy(E2*1000);
 
+      Electron->SetQualityFactor(ChiT1x+ChiT2x);
+      Positron->SetQualityFactor(ChiT1y+ChiT2y);
+
       mdebug<<"Energy of the two particles: "<<E1<<" "<<E2<<endl;
       mdebug<<"Reconstructed theta, phi and energy of the gamma: "<<c_Deg*direction.Theta()<<" "<<c_Deg*direction.Phi()<<" "<<Egamma<<endl;
       RE->SetElectronTrack(Electron);
       RE->SetPositronTrack(Positron);
 
-      RE->SetTrackQualityFactor((ChiT1y+ChiT2y)/100);
-      RE->SetPairQualityFactor((ChiT1y+ChiT2y)/100);
+      //RE->SetTrackQualityFactor((ChiT1y+ChiT2y)/100);
+      RE->SetPairQualityFactor((ChiT1y+ChiT2y));
       RE->SetGoodEvent(true);
       RE->SetEventType(MRERawEvent::c_PairEvent);
 

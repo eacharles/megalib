@@ -50,7 +50,6 @@ MGUIERAlgorithm::MGUIERAlgorithm(const TGWindow* Parent, const TGWindow* Main,
   : MGUIDialog(Parent, Main)
 {
   // Construct an instance of MGUIERAlgorithm and bring it to the screen
-  m_Data = new MSettingsEventReconstruction();
   m_Data = Data;
 
   Create();
