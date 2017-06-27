@@ -2246,7 +2246,7 @@ int MSimEvent::GetLengthOfFirstComptonTrack()
   vector<MSimHT*> HTs;
   for (unsigned int h = 0; h < GetNHTs(); ++h) {
     if (GetHTAt(h)->IsOrigin(2) == true) {
-      if (GetHTAt(h)->GetVolumeSequence()->GetDetector()->GetDetectorType() == MDDetector::c_Strip2D) {
+      if (GetHTAt(h)->GetVolumeSequence()->GetDetector()->GetType() == MDDetector::c_Strip2D) {
         HTs.push_back(GetHTAt(h));
       }
     }
@@ -2890,7 +2890,7 @@ bool MSimEvent::Discretize(int Detector)
             m_HTs.push_back(Hit); 
             DetectorEnergy += Point.GetEnergy();
           }
-        } else if (Point.GetType() == MDGridPoint::c_Guardring) {
+        } else if (Point.GetType() == MDGridPoint::c_GuardRing) {
           MSimGR* GR = new MSimGR((*Iter).first,
                                   Grid.GetWorldPositionGridPointAt(p),
                                   Point.GetEnergy(),
@@ -2943,7 +2943,7 @@ bool MSimEvent::Discretize(int Detector)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-double MSimEvent::GetGuardringEnergy()
+double MSimEvent::GetGuardRingEnergy()
 {
   //! Return the total energy deposit in all guard rings:
 

@@ -90,6 +90,7 @@ using namespace std;
 #include "MDACS.h"
 #include "MDDriftChamber.h"
 #include "MDVoxel3D.h"
+#include "MDGuardRing.h"
 #include "MVector.h"
 #include "MRotation.h"
 
@@ -277,7 +278,7 @@ bool MCDetectorConstruction::ConstructDetectors()
   MCSD* SD = 0;
   for (unsigned int d = 0; d < m_Geometry->GetNDetectors(); ++d) {
 
-    Type = m_Geometry->GetDetectorAt(d)->GetDetectorType();
+    Type = m_Geometry->GetDetectorAt(d)->GetType();
     Name = m_Geometry->GetDetectorAt(d)->GetName() + "SD";
 
     Detector = m_Geometry->GetDetectorAt(d);
@@ -303,9 +304,11 @@ bool MCDetectorConstruction::ConstructDetectors()
                             Strip->GetPitchY()*cm);
       TwoDStripSD->SetNStrips(Strip->GetNStripsX(), 
                               Strip->GetNStripsY());
-      TwoDStripSD->SetUniqueGuardringPosition(G4ThreeVector(Strip->GetUniqueGuardringPosition().X()*cm,
-                                                            Strip->GetUniqueGuardringPosition().Y()*cm,
-                                                            Strip->GetUniqueGuardringPosition().Z()*cm));
+      if (Strip->HasGuardRing() == true) {
+        TwoDStripSD->SetUniqueGuardringPosition(G4ThreeVector(Strip->GetGuardRing()->GetUniquePosition().X()*cm,
+                                                              Strip->GetGuardRing()->GetUniquePosition().Y()*cm,
+                                                              Strip->GetGuardRing()->GetUniquePosition().Z()*cm));
+      }
 
       SDManager->AddNewDetector(TwoDStripSD);
       mdebug<<"Adding Strip detector for "<<Name<<endl;
@@ -345,9 +348,11 @@ bool MCDetectorConstruction::ConstructDetectors()
       Voxel3DSD->SetNVoxels(Voxler->GetNVoxelsX(), 
                             Voxler->GetNVoxelsY(),
                             Voxler->GetNVoxelsZ());
-      Voxel3DSD->SetUniqueGuardringPosition(G4ThreeVector(Voxler->GetUniqueGuardringPosition().X()*cm,
-                                                          Voxler->GetUniqueGuardringPosition().Y()*cm,
-                                                          Voxler->GetUniqueGuardringPosition().Z()*cm));
+      if (Voxler->HasGuardRing() == true) {
+        Voxel3DSD->SetUniqueGuardringPosition(G4ThreeVector(Voxler->GetGuardRing()->GetUniquePosition().X()*cm,
+                                                            Voxler->GetGuardRing()->GetUniquePosition().Y()*cm,
+                                                            Voxler->GetGuardRing()->GetUniquePosition().Z()*cm));
+      }
 
       SDManager->AddNewDetector(Voxel3DSD);
       mdebug<<"Adding Voxler detector for "<<Name<<endl;
@@ -509,7 +514,10 @@ bool MCDetectorConstruction::ConstructDetectors()
           }
         }
       }
-
+    }
+    
+    else if (Type == MDDetector::c_GuardRing) {
+      // This is part of the strip & voxel detectors!
     } else {
       merr<<"DetectorType not yet implemented ("
           <<Detector->GetName()<<")!"<<endl;
