@@ -105,7 +105,7 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
   ////////////////////////////////////////////////////////////////////////////////
 
 
-  bool MERTrackKalman2D::EvaluateTracks(MRERawEvent* RE)
+  /*bool MERTrackKalman2D::EvaluateTracks(MRERawEvent* RE)
   {
     // Evaluate the given tracks...
 
@@ -122,7 +122,7 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
     RE->SetPairQualityFactor(MRERawEvent::c_NoQualityFactor);
 
     return true;
-  }
+  }*/
 
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -240,12 +240,9 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
       for (int k = 0; k < r; k++) {
         if(List.GetRESEAt(k)->GetPosition().Z()-PlaneZ < 0.0001) break;
         _planedistance = List.GetRESEAt(k)->GetPosition().Z()-PlaneZ;
-        if(k==r-1 && _planedistance>1.5) {
-          return chi2;
-        }
       }
 
-      if(_planedistance>1.5) return chi2; // we accept only hits on subsequent planes
+      if(_planedistance>1.5) break; // we accept only hits on subsequent planes
 
       t=(13.6/en)*sqrt(m_heightX0)*(1+0.038*log(m_heightX0));
 
@@ -348,6 +345,7 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
     }
 
     if ((Int_t) xk.size()<n) n = xk.size();
+    if (n<2) return chi2;
 
     //Smoothing
 
@@ -617,8 +615,8 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
     //View Y
     tie(Track1y, E1y, ChiT1y, Track2y, E2y, ChiT2y, Chosen1y, Chosen2y) = SearchTracks(RE, 1);
 
-    if ((ChiT1y==0. && ChiT2y==0.) || (ChiT1y==0. && ChiT2y==0.)) return;
-    //if ((ChiT1x>100. && ChiT1y>100.)) return;
+    if (ChiT1y==0. && ChiT2y==0.) return;
+
     if((E1x-E2x)*(E1y-E2y)<0.){
       Float_t E1ytemp=E1y;
       E1y=E2y;
