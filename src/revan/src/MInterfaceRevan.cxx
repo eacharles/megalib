@@ -134,8 +134,8 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
   Usage<<endl;
   Usage<<"      -a --analyze:"<<endl;
   Usage<<"             Analyze the evta-file given with the -f option, otherwise the file in the configuration file"<<endl;
-  Usage<<"      -e --energy-before:"<<endl;
-  Usage<<"             Show the spectrum before the analysis"<<endl;
+  Usage<<"      -s --generate spectra:"<<endl;
+  Usage<<"             Generate spectra using the options previously set in the GUI and stored in the configuration file"<<endl;
   Usage<<endl;
   Usage<<"      -d --debug:"<<endl;
   Usage<<"             Use debug mode"<<endl;
@@ -268,9 +268,9 @@ bool MInterfaceRevan::ParseCommandLine(int argc, char** argv)
       cout<<"Command-line parser: Analyzing..."<<endl;
       AnalyzeEvents();
       return false;
-    } else if (Option == "--energy-before" || Option == "-e") {
-      cout<<"Command-line parser: Showing energy histogram before reconstruction..."<<endl;
-      InitialEnergySpectrum();
+    } else if (Option == "--generate-spectra" || Option == "-s") {
+      cout<<"Command-line parser: Generate spectra (use the options from the configuration file)"<<endl;
+      GenerateSpectra();
       return true;
     }
   }
@@ -420,6 +420,8 @@ void MInterfaceRevan::AnalyzeEvents()
   } else if (FilenameOut.EndsWith("sim.gz")) {
     FilenameOut.Replace(FilenameOut.Length()-6, 6, "tra.gz");
   }
+  
+  FilenameOut = MFile::GetWorkingDirectory() + "/" + MFile::GetBaseName(FilenameOut);
 
   MRawEventAnalyzer Analyzer;
   Analyzer.SetGeometry(m_Geometry);
@@ -714,23 +716,6 @@ void MInterfaceRevan::GenerateSpectra()
 
   // Step 4: Dump it!
 
-  if (OutputScreen == true) {
-    int c = 0;
-    const int MaxCanvases = 100;
-    for (TH1D* Hist: AllSpectra) {
-      if (++c > MaxCanvases) {
-        mgui<<"We only display up to "<<MaxCanvases<<" individual spectra"<<info;
-        break;
-      }
-
-      TCanvas* C = new TCanvas();
-      C->cd();
-      if (xLog == true) C->SetLogx();
-      Hist->Draw();
-      C->Update();
-    }
-  }
-
   if (OutputFile == true) {
     for (TH1D* Hist: AllSpectra) {
       MString FileName = m_Data->GetCurrentFileName();
@@ -769,6 +754,31 @@ void MInterfaceRevan::GenerateSpectra()
     }
   }
 
+  if (OutputScreen == true) {
+    int c = 0;
+    const int MaxCanvases = 100;
+    for (TH1D* Hist: AllSpectra) {
+      if (++c > MaxCanvases) {
+        mgui<<"We only display up to "<<MaxCanvases<<" individual spectra"<<info;
+        break;
+      }
+      
+      // Convert to cts/keV
+      for (int b = 1; b <= Hist->GetXaxis()->GetNbins(); ++b) {
+        if (Hist->GetBinContent(b) > 0) {
+          Hist->SetBinContent(b, Hist->GetBinContent(b)/Hist->GetBinWidth(b));
+        }
+      }
+      
+      TCanvas* C = new TCanvas();
+      C->cd();
+      if (xLog == true) C->SetLogx();
+      Hist->Draw();
+      C->Update();
+    }
+  }  
+  
+  
   delete [] xBins;
 }
 

@@ -7,8 +7,8 @@
 
 # Install path realtive to the build path --- simply one up in this script
 CONFIGUREOPTIONS="-DCMAKE_INSTALL_PREFIX=.."
-# To comile ROOT 6.x with gcc 5.x
-CONFIGUREOPTIONS+=" -DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=0"
+# To compile ROOT 6.06 with gcc 5.x --- no longer  needed for ROOT 6.08 and higher
+#CONFIGUREOPTIONS+=" -DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=0"
 # We want a minimal system and enable what we really need:
 #CONFIGUREOPTIONS+=" -Dgminimal=ON"
 # Open GL -- needed by geomega
@@ -482,9 +482,9 @@ fi
 
 
 CORES=1;
-if ( `test -f /usr/sbin/sysctl` ); then
+if [[ ${OSTYPE} == darwin* ]]; then
   CORES=`sysctl -n hw.logicalcpu_max`
-elif ( `test -f /proc/cpuinfo` ); then 
+elif [[ ${OSTYPE} == linux* ]]; then 
   CORES=`grep processor /proc/cpuinfo | wc -l`
 fi
 if [ "$?" != "0" ]; then

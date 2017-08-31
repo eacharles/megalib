@@ -266,6 +266,8 @@ void MCSource::Initialize()
   m_PolarizationParam3 = c_Invalid;
   m_PolarizationDegree = 0.0;
   
+  m_UseFarFieldTransmissionProbability = false;
+  
   m_NGeneratedParticles = 0;
   
   m_PositionParam1 = c_Invalid;
@@ -375,9 +377,27 @@ bool MCSource::GenerateParticles(G4GeneralParticleSource* ParticleGun)
       m_Successor = "";      
     }
   }
-
+  
   ++m_NGeneratedParticles;
 
+  // If we have a far field transmission probability, we might still skip this event:
+  if (m_UseFarFieldTransmissionProbability == true) {
+    double Energy = ParticleGun->GetCurrentSource()->GetEneDist()->GetMonoEnergy()/keV;
+    G4ThreeVector Dir = -ParticleGun->GetCurrentSource()->GetAngDist()->GenerateOne();
+    double Theta = Dir.getTheta() / deg;
+    
+    double TransmissionProbability = m_FarFieldTransmissionProbability.Evaluate(Theta, Energy);
+    //mout<<"Transmission probability: "<<TransmissionProbability<<" for t="<<Theta<<" deg, E="<<Energy<<" keV"<<endl;
+    
+    if (CLHEP::RandFlat::shoot(1) > TransmissionProbability) {
+      //mout<<m_Name<<": Particle absorbed. Setting energy to zero."<<endl;
+      ParticleGun->GetCurrentSource()->GetEneDist()->SetMonoEnergy(0);
+    } else {
+      //mout<<m_Name<<": Particle transmitted."<<endl;
+    }
+  }
+  
+  
   return true;
 }
 
@@ -1847,6 +1867,27 @@ bool MCSource::SetTotalEnergyFlux(const double& TotalEnergyFlux)
 
 
 /******************************************************************************
+ * Return true, if the far field transmission probability file could be set and read correctly
+ */
+bool MCSource::SetFarFieldTransmissionProbability(const MString& FileName)
+{
+  if (m_CoordinateSystem != c_FarField) {
+    mout<<"  ***  ERROR  ***   "<<m_Name<<": SetFarFieldTransmissionProbability: You can only use a far field transmission probability for far field sources!"<<endl;
+    return false;
+  }
+
+  if (m_FarFieldTransmissionProbability.Set(FileName, "AP") == false) {
+    mout<<"  ***  ERROR  ***   "<<m_Name<<": SetFarFieldTransmissionProbability: Unable to load far field transmission probability!"<<endl;
+    return false;
+  }
+  
+  m_UseFarFieldTransmissionProbability = true;
+
+  return true;
+}
+
+
+/******************************************************************************
  * Return true, if the light curve could be set correctly
  */
 bool MCSource::SetLightCurve(const MString& FileName, const bool& Repeats)
@@ -3105,6 +3146,7 @@ bool MCSource::GeneratePolarization(G4GeneralParticleSource* Gun)
   } else if (m_PolarizationType == c_PolarizationRandom) {
     m_Polarization = m_Direction.orthogonal();
     m_Polarization.rotate(m_Direction, CLHEP::RandFlat::shoot(2*c_Pi));
+    m_Polarization = m_Polarization.unit();
   } else if (m_PolarizationType == c_PolarizationAbsolute || 
              m_PolarizationType == c_PolarizationRelativeX ||
              m_PolarizationType == c_PolarizationRelativeY ||
@@ -3122,15 +3164,18 @@ bool MCSource::GeneratePolarization(G4GeneralParticleSource* Gun)
           m_Polarization = m_Direction.cross(G4ThreeVector(0.0, 0.0, 1.0));
         }
         m_Polarization.rotate(m_Direction, m_PolarizationParam1);
+        m_Polarization = m_Polarization.unit();
       }
     } else {
       m_Polarization = m_Direction.orthogonal();
       m_Polarization.rotate(m_Direction, CLHEP::RandFlat::shoot(2*c_Pi));
+      m_Polarization = m_Polarization.unit();
     }
   } else {
     merr<<m_Name<<": Unknown polarization type: "<<m_PolarizationType<<endl;
     m_Polarization = m_Direction.orthogonal();
     m_Polarization.rotate(m_Direction, CLHEP::RandFlat::shoot(2*c_Pi));
+    m_Polarization = m_Polarization.unit();
   }
   
   if (m_PolarizationType != c_PolarizationNone) {

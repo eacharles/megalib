@@ -75,6 +75,7 @@ using namespace std;
 #include "MResponseEnergyLeakage.h"
 #include "MBinnerBayesianBlocks.h"
 
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -634,6 +635,11 @@ void MInterfaceMimrec::Reconstruct(bool Animate)
 
   if (JustShowImage == false) {
 
+    if (m_Imager->SetDeconvolutionSettings(m_Settings) == false) {
+      mgui<<"Unable to set all deconvolution settings"<<error;
+      return;
+    }
+    
     // Analyze... do the reconstruction
     m_Imager->Analyze(!JustDeconvolve);
 
@@ -1244,7 +1250,11 @@ void MInterfaceMimrec::ARMGamma()
       Confidence->SetTitle("Confidence Histogram ARM");
       Confidence->SetLineColor(kAzure+10);
       Confidence->SetFillColor(kAzure+10);
-      (TVirtualFitter::GetFitter())->GetConfidenceIntervals(Confidence, ConfidenceLevel);
+      if (TVirtualFitter::GetFitter() != nullptr) {
+        (TVirtualFitter::GetFitter())->GetConfidenceIntervals(Confidence, ConfidenceLevel);
+      } else {
+        merr<<"Virtual fitter is nullptr -- confidence intervals are wrong!"<<endl; 
+      }
       Hist->SetTitle(MString("ARM (Compton cone) with ") + ConfidenceLevelString + MString(" confidence intervals"));
     }
   }
@@ -6194,8 +6204,9 @@ void MInterfaceMimrec::CreateCosimaOrientationFile()
 
   bool First = true;
   MTime LastTime(0);
-  MTime Gap(5.0);
-
+  MTime Gap(5.0); 
+  
+  bool IsOn = false;
   MPhysicalEvent* Event = nullptr;
   while ((Event = GetNextEvent()) != 0) {
     if (Event->HasGalacticPointing() == true) {
@@ -6215,22 +6226,43 @@ void MInterfaceMimrec::CreateCosimaOrientationFile()
         LastZAxisLatitude = Event->GetGalacticPointingZAxisLatitude();
       }
       if (First == false) {
-        if (Event->GetTime() - LastTime > Gap) {
-          cout<<"Off: "<<Event->GetTime()<<":"<<LastTime<<endl;
-          lout<<"DP "<<LastTime<<" off"<<endl;
-          lout<<"DP "<<Event->GetTime()<<" on"<<endl;
+        if (Event->GetTime() < LastTime) {
+          if (IsOn == true) {
+            cout<<"Backwards JUMP! Off: "<<Event->GetTime()<<":"<<LastTime<<endl;
+            lout<<"DP "<<LastTime<<" off"<<endl;
+            IsOn = false;
+          }
+        } else {  
+          if (Event->GetTime() - LastTime > Gap) {
+            if (IsOn == true) {
+              cout<<"Forward Jump: Off: "<<Event->GetTime()<<":"<<LastTime<<endl;
+              lout<<"DP "<<LastTime<<" off"<<endl;
+              IsOn = false;
+            }
+          } else {
+            if (IsOn == false) {
+              //cout<<"On: "<<Event->GetTime()<<":"<<LastTime<<endl;
+              lout<<"DP "<<LastTime<<" on"<<endl;
+              IsOn = true;
+            }
+          }
         }
       } else {
+        //cout<<"On: "<<Event->GetTime()<<":"<<LastTime<<endl;
         lout<<"DP "<<Event->GetTime()<<" on"<<endl;
         First = false;
+        IsOn = true;
       }
-      LastTime = Event->GetTime();
+      if (Event->GetTime() > LastTime) {
+        LastTime = Event->GetTime();
+      }
     }
 
     delete Event;
   }
-  if (First == false) {
-    lout<<LastTime<<" off"<<endl;
+  if (IsOn == true) {
+    //cout<<"Off: "<<LastTime<<endl;
+    lout<<"DP "<<LastTime<<" off"<<endl;
   }
 
   // Close the event loader

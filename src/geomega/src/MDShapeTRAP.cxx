@@ -173,32 +173,32 @@ bool MDShapeTRAP::Set(double Dz, double Theta, double Phi,
   // Check coplanarity:
   if (v1.Coplanar(v2, v3, v4, 1E-5) == false) {
     mout<<"   ***  Error  ***  in shape TRAP "<<endl;
-    mout<<"Some of the surface vectors are not coplanar (v1, v2, v3, v4)"<<endl;
+    mout<<"Some of the surface vectors are not coplanar (v1, v2, v3, v4 --> the 4 edge points in -z direction do not form a plane)"<<endl;
     return false;            
   }
   if (v5.Coplanar(v6, v7, v8, 1E-5) == false) {
     mout<<"   ***  Error  ***  in shape TRAP "<<endl;
-    mout<<"Some of the surface vectors are not coplanar (v5, v6, v7, v8)"<<endl;
+    mout<<"Some of the surface vectors are not coplanar (v5, v6, v7, v8 --> the 4 edge points in +z direction do not form a plane)"<<endl;
     return false;            
   }
   if (v2.Coplanar(v4, v6, v8, 1E-5) == false) {
     mout<<"   ***  Error  ***  in shape TRAP "<<endl;
-    mout<<"Some of the surface vectors are not coplanar (v2, v4, v6, v8)"<<endl;
+    mout<<"Some of the surface vectors are not coplanar (v2, v4, v6, v8 --> the 4 edge points in +x direction do not form a plane)"<<endl;
     return false;            
   }
   if (v1.Coplanar(v3, v5, v7, 1E-5) == false) {
     mout<<"   ***  Error  ***  in shape TRAP "<<endl;
-    mout<<"Some of the surface vectors are not coplanar (v1, v3, v5, v7)"<<endl;
+    mout<<"Some of the surface vectors are not coplanar (v1, v3, v5, v7 --> the 4 edge points in -x direction do not form a plane)"<<endl;
     return false;            
   }
   if (v1.Coplanar(v2, v5, v6, 1E-5) == false) {
     mout<<"   ***  Error  ***  in shape TRAP "<<endl;
-    mout<<"Some of the surface vectors are not coplanar (v1, v2, v5, v6)"<<endl;
+    mout<<"Some of the surface vectors are not coplanar (v1, v2, v5, v6 --> the 4 edge points in -y direction do not form a plane)"<<endl;
     return false;            
   }
   if (v3.Coplanar(v4, v7, v8, 1E-5) == false) {
     mout<<"   ***  Error  ***  in shape TRAP "<<endl;
-    mout<<"Some of the surface vectors are not coplanar (v3, v4, v7, v8)"<<endl;
+    mout<<"Some of the surface vectors are not coplanar (v3, v4, v7, v8 --> the 4 edge points in +y direction do not form a plane)"<<endl;
     return false;            
   }
 
@@ -395,56 +395,6 @@ double MDShapeTRAP::GetAlpha2() const
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MString MDShapeTRAP::GetGeant3DIM(MString ShortName)
-{
-  ostringstream out;
-
-  out<<"      REAL V"<<ShortName<<"VOL"<<endl;
-  out<<"      DIMENSION V"<<ShortName<<"VOL(11)"<<endl;  
-
-  return out.str().c_str();
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-MString MDShapeTRAP::GetGeant3DATA(MString ShortName)
-{
-  //
-
-  ostringstream out;
-  out.setf(ios::fixed, ios::floatfield);
-  out.precision(4);
-  out<<"      DATA V"<<ShortName<<"VOL/"<<m_Dz<<","<<m_Theta<<","<<m_Phi<<","<<m_H1<<","<<m_Bl1<<","<<m_Tl1<<","<<m_Alpha1<<","<<m_H2<<","<<m_Bl2<<","<<m_Tl2<<","<<m_Alpha2<<"/"<<endl;
-
-  return out.str().c_str();
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-MString MDShapeTRAP::GetMGeantDATA(MString ShortName)
-{
-  // Write the shape parameters in MGEANT/mggpod format.
-
-  ostringstream out;
-  out.setf(ios::fixed, ios::floatfield);
-  out.precision(4);
-
-  out<<"           "<<m_Dz    <<" "<<m_Theta <<" "<<m_Phi<<endl;
-  out<<"           "<<m_H1    <<" "<<m_Bl1   <<" "<<m_Tl1<<endl;
-  out<<"           "<<m_Alpha1<<" "<<m_H2    <<" "<<m_Bl2<<endl;
-  out<<"           "<<m_Tl2   <<" "<<m_Alpha2<<endl;
-
-  return out.str().c_str();
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
 MString MDShapeTRAP::GetGeomega() const
 {
   // Return the Geomega representation 
@@ -455,28 +405,6 @@ MString MDShapeTRAP::GetGeomega() const
      <<m_H2<<" "<<m_Bl2<<" "<<m_Tl2<<" "<<m_Alpha2;
 
   return out.str().c_str();
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-MString MDShapeTRAP::GetGeant3ShapeName()
-{
-  //
-
-  return "TRAP";
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-int MDShapeTRAP::GetGeant3NumberOfParameters()
-{
-  //
-
-  return 11;
 }
 
 

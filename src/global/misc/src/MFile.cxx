@@ -220,8 +220,24 @@ bool MFile::Exists(MString FileName)
 
   return true;
 }
+////////////////////////////////////////////////////////////////////////////////
 
 
+//! Return true if the file was removed successfully
+bool MFile::Remove(MString FileName)
+{
+  MFile::ExpandFileName(FileName);
+  if (FileName.Length() <= 1) return false;
+  if (FileName.EndsWith("/") == true) return false;
+
+  if (FileName == GetDirectoryName(FileName)) { // does not work in all cases..!
+    return false;
+  }
+  
+  return (remove(FileName) == 0) ? true : false; 
+}
+  
+  
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -1125,7 +1141,17 @@ MString MFile::GetBaseName(const MString& Name)
   return Name.GetSubString(Pos+1);
 }
 
+////////////////////////////////////////////////////////////////////////////////
 
+
+MString MFile::GetWorkingDirectory()
+{
+  //! Return the current working directory
+
+  return gSystem->GetWorkingDirectory();  
+}
+
+  
 ////////////////////////////////////////////////////////////////////////////////
 
 

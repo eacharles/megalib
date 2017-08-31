@@ -142,6 +142,8 @@ class MFile
   static bool Exists(MString FileName);
   //! Return true is the file exists
   static bool FileExists(const char* FileName); // depreciated
+  //! Return true if the file was removed successfully
+  static bool Remove(MString FileName);
   //! Check if a program exists
   static bool ProgramExists(MString Program);
   //! Sets the path of "Path" as new path to "FileName" IF FileName has a relative path
@@ -155,9 +157,11 @@ class MFile
   static MString RelativeFileName(MString RelFileName, MString AbsFileName);
   //! Return the directory name (replacement for inconsistent gSystem->DirName)
   static MString GetDirectoryName(const MString& Name);
-  //! Return the directory name (replacement for inconsistent gSystem->DirName)
+  //! Return the base file name
   static MString GetBaseName(const MString& Name);
-
+  //! Return the current working directory
+  static MString GetWorkingDirectory();
+  
 
   //! The file modes: Write to a new file
   static unsigned int c_Write;

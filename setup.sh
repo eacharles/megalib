@@ -155,9 +155,9 @@ CLEANUP="off"
 BRANCH=""
 
 MAXTHREADS=1;
-if ( `test -f /usr/sbin/sysctl` ); then
+if [[ ${OSTYPE} == darwin* ]]; then
   MAXTHREADS=`sysctl -n hw.logicalcpu_max`
-elif ( `test -f /proc/cpuinfo` ); then
+elif [[ ${OSTYPE} == linux* ]]; then
   MAXTHREADS=`grep processor /proc/cpuinfo | wc -l`
 fi
 if [ "$?" != "0" ]; then
@@ -1021,7 +1021,7 @@ mv ${ENVFILE} bin/source-megalib.sh
 
 echo "Storing last good options..."
 rm -f ${MEGALIBDIR}/config/SetupOptions.txt
-SETUP="--external-path=${EXTERNALPATH} --root=${ROOTPATH} --geant4=${GEANT4PATH} --release=${RELEASE} --repository=${REPOSITORY} --optimization=${OPT} --debug=${DEBUG} --updates=${UPDATES} --patch=${PATCH} --cleanup=${CLEANUP} --keepmegalibasis=${KEEPMEGALIBASIS} --keepenvironmentasis=${KEEPENVASIS}"
+SETUP="--external-path=${EXTERNALPATH} --root=${ROOTPATH} --geant4=${GEANT4PATH} --release=${RELEASE} --repository=${REPOSITORY} --optimization=${OPT} --debug=${DEBUG} --updates=${UPDATES} --patch=${PATCH} --cleanup=${CLEANUP} --keepmegalibasis=${KEEPMEGALIBASIS} --keepenvironmentasis=${KEEPENVASIS} --maxthreads=${MAXTHREADS}"
 if [[ ${BRANCH} != "" ]]; then
   SETUP+=" --branch=${BRANCH}"
 fi
