@@ -21,6 +21,8 @@
 // MEGAlib libs:
 #include "MGlobal.h"
 #include "MSettingsInterface.h"
+#include "MERCSRTMVAMethods.h"
+
 
 // Forward declarations:
 
@@ -213,8 +215,11 @@ class MSettingsEventReconstruction : public MSettingsInterface
   void SetBayesianComptonFileName(MString Name) { m_BayesianComptonFileName = Name; }
   MString GetBayesianComptonFileName() { return m_BayesianComptonFileName; }
 
-  void SetNeuralNetworkFileName(MString Name) { m_NeuralNetworkFileName = Name; }
-  MString GetNeuralNetworkFileName() { return m_NeuralNetworkFileName; }
+  void SetTMVAFileName(MString Name) { m_TMVAFileName = Name; }
+  MString GetTMVAFileName() { return m_TMVAFileName; }
+
+  void SetTMVAMethods(MERCSRTMVAMethods TMVAMethods) { m_TMVAMethods = TMVAMethods; }
+  MERCSRTMVAMethods GetTMVAMethods() { return m_TMVAMethods; }
 
   void SetOriginObjectsFileName(MString Name) { m_OriginObjectsFileName = Name; }
   MString GetOriginObjectsFileName() { return m_OriginObjectsFileName; }
@@ -328,7 +333,10 @@ class MSettingsEventReconstruction : public MSettingsInterface
 
   MString m_BayesianComptonFileName;
 
-  MString m_NeuralNetworkFileName;
+  //! The TMVA file name
+  MString m_TMVAFileName;
+  //! The TMVA methods
+  MERCSRTMVAMethods m_TMVAMethods;
 
   MVector m_LensCenter;
   MVector m_FocalSpotCenter;

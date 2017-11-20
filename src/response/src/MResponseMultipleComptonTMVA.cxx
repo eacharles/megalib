@@ -30,6 +30,7 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
+#include <thread>
 using namespace std;
 
 // ROOT libs:
@@ -40,7 +41,10 @@ using namespace std;
 #include "MStreams.h"
 #include "MSystem.h"
 #include "MRESEIterator.h"
-
+#include "TMVA/Factory.h"
+#include "TMVA/DataLoader.h"
+#include "TMVA/Tools.h"
+#include "TMVA/TMVAGui.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -58,19 +62,8 @@ MResponseMultipleComptonTMVA::MResponseMultipleComptonTMVA()
   // Construct an instance of MResponseMultipleComptonTMVA
   
   m_ResponseNameSuffix = "tmva";
-  
-  m_DoAbsorptions = true;
-  m_MaxAbsorptions = 10;
-  m_CSRMaxLength = 10;
-  
-  m_MaxEnergyDifference = 5; // keV
-  m_MaxEnergyDifferencePercent = 0.02;
-  
-  m_MaxTrackEnergyDifference = 30; // keV
-  m_MaxTrackEnergyDifferencePercent = 0.1;
-  
-  // We can save much more frequently here, since the files are a lot smaller
-  m_SaveAfter = numeric_limits<long>::max();
+  m_MaxNEvents = 10000000; // 10 Mio
+  m_MethodsString = "BDTD";
 }
 
 
@@ -89,166 +82,86 @@ MResponseMultipleComptonTMVA::~MResponseMultipleComptonTMVA()
 //! Initialize the response matrices and their generation
 bool MResponseMultipleComptonTMVA::Initialize() 
 { 
-  // Initialize next matching event, save if necessary
-  if (MResponseBuilder::Initialize() == false) return false;
-  
-  // We are not doing any sequencing or decay detection!
-  m_ReReader->SetCSRAlgorithm(MRawEventAnalyzer::c_CSRAlgoNone);
-  m_ReReader->SetDecayAlgorithm(MRawEventAnalyzer::c_DecayAlgoNone);
-  if (m_ReReader->PreAnalysis() == false) return false;
-  
-  
-  // Build permutation matrix:
-  m_Permutator.resize(m_CSRMaxLength+1);
-  for (unsigned int i = 2; i <= (unsigned int) m_CSRMaxLength; ++i) {
-    vector<vector<unsigned int>> Permutations;
-    vector<unsigned int> Indices;
-    for (unsigned int j = 0; j < i; ++j) {
-      Indices.push_back(j);
-    }
-    vector<unsigned int>::iterator Begin = Indices.begin();
-    vector<unsigned int>::iterator End = Indices.end();
-    do {
-      Permutations.push_back(Indices);
-    } while (next_permutation(Begin, End));
-    m_Permutator[i] = Permutations;
-  }
-  //   // Verify:
-  //   for (unsigned int i = 2; i < m_Permutator.size(); ++i) {
-  //     cout<<"Size: "<<i<<endl;
-  //     for (unsigned int j = 0; j < m_Permutator[i].size(); ++j) {
-  //       cout<<"  Permutation "<<j<<"/"<<m_Permutator[i].size()<<": "<<endl;
-  //       for (unsigned int k = 0; k < m_Permutator[i][j].size(); ++k) {
-  //         cout<<m_Permutator[i][j][k]<<" ";
-  //       }
-  //       cout<<endl;
-  //     }
-  //   }  
-  
-  // Create the ROOT tree for TMVA analysis
-  
-  m_CSRMaxLength = 2;
-  cout<<"Fixing m_CSRMaxLength = "<<m_CSRMaxLength<<endl;
-  
-  for (int c = 0; c <= m_CSRMaxLength-2; ++c) {
-    int l = c+2;
-    
-    TTree* Good = new TTree("Good", "Good Compton ER tree"); //"ComptonTMVA", "ComptonTMVA");
-    TTree* Bad = new TTree("Bad", "Bad Compton ER tree"); //"ComptonTMVA", "ComptonTMVA");
-    
-    m_SimulationIDs.push_back(0);
-    MString Name("SimulationIDs");
-    Good->Branch(Name, &m_SimulationIDs[c], Name + "/L");
-    Bad->Branch(Name, &m_SimulationIDs[c], Name + "/L");
-    
-    m_Energies.push_back(vector<double>(l));
-    for (unsigned int i = 0; i < m_Energies[c].size(); ++i) {
-      Name = "Energy";
-      Name += i+1;
-      Good->Branch(Name, &m_Energies[c][i], Name + "/D");
-      Bad->Branch(Name, &m_Energies[c][i], Name + "/D");
-    }
-    
-    
-    m_PositionsX.push_back(vector<double>(l));
-    for (unsigned int i = 0; i < m_PositionsX[c].size(); ++i) {
-      Name = "X";
-      Name += i+1;
-      Good->Branch(Name, &m_PositionsX[c][i], Name + "/D");
-      Bad->Branch(Name, &m_PositionsX[c][i], Name + "/D");
-    }
-    m_PositionsY.push_back(vector<double>(l));
-    for (unsigned int i = 0; i < m_PositionsY[c].size(); ++i) {
-      Name = "Y";
-      Name += i+1;
-      Good->Branch(Name, &m_PositionsY[c][i], Name + "/D");
-      Bad->Branch(Name, &m_PositionsY[c][i], Name + "/D");
-    }
-    m_PositionsZ.push_back(vector<double>(l));
-    for (unsigned int i = 0; i < m_PositionsZ[c].size(); ++i) {
-      Name = "Z";
-      Name += i+1;
-      Good->Branch(Name, &m_PositionsZ[c][i], Name + "/D");
-      Bad->Branch(Name, &m_PositionsZ[c][i], Name + "/D");
-    }
-    
-    
-    m_ComptonScatterAngles.push_back(vector<double>(l-1));
-    for (unsigned int i = 0; i < m_ComptonScatterAngles[c].size(); ++i) {
-      Name = "ComptonScatterAngle";
-      Name += i+1;
-      Good->Branch(Name, &m_ComptonScatterAngles[c][i], Name + "/D");
-      Bad->Branch(Name, &m_ComptonScatterAngles[c][i], Name + "/D");
-    }
-    
-    m_KleinNishinaProbability.push_back(vector<double>(l-1));
-    for (unsigned int i = 0; i < m_KleinNishinaProbability[c].size(); ++i) {
-      Name = "KleinNishinaProbability";
-      Name += i+1;
-      Good->Branch(Name, &m_KleinNishinaProbability[c][i], Name + "/D");
-      Bad->Branch(Name, &m_KleinNishinaProbability[c][i], Name + "/D");
-    }
-    
-    if (l > 2) {
-      m_ComptonScatterAngleDifference.push_back(vector<double>(l-2));
-      for (unsigned int i = 0; i < m_ComptonScatterAngleDifference[c-1].size(); ++i) { // "-1" since we only start at 3 interactions
-        Name = "ComptonScatterAngleDifference";
-        Name += i+1;
-        Good->Branch(Name, &m_ComptonScatterAngleDifference[c-1][i], Name + "/D");
-        Bad->Branch(Name, &m_ComptonScatterAngleDifference[c-1][i], Name + "/D");
-      }
-    }
-    
-    m_AbsorptionProbabilities.push_back(vector<double>(l-1));
-    for (unsigned int i = 0; i < m_AbsorptionProbabilities[c].size(); ++i) {
-      Name = "AbsorptionProbabilities";
-      Name += i+1;
-      Good->Branch(Name, &m_AbsorptionProbabilities[c][i], Name + "/D");
-      Bad->Branch(Name, &m_AbsorptionProbabilities[c][i], Name + "/D");
-    }
-    
-    m_AbsorptionProbabilityToFirstIAAverage.push_back(0);
-    Name = "AbsorptionProbabilityToFirstIAAverage";
-    Good->Branch(Name, &m_AbsorptionProbabilityToFirstIAAverage[c], Name + "/D");
-    Bad->Branch(Name, &m_AbsorptionProbabilityToFirstIAAverage[c], Name + "/D");
-    
-    m_AbsorptionProbabilityToFirstIAMaximum.push_back(0);
-    Name = "AbsorptionProbabilityToFirstIAMaximum";
-    Good->Branch(Name, &m_AbsorptionProbabilityToFirstIAMaximum[c], Name + "/D");
-    Bad->Branch(Name, &m_AbsorptionProbabilityToFirstIAMaximum[c], Name + "/D");
-    
-    m_AbsorptionProbabilityToFirstIAMinimum.push_back(0);
-    Name = "AbsorptionProbabilityToFirstIAMinimum";
-    Good->Branch(Name, &m_AbsorptionProbabilityToFirstIAMinimum[c], Name + "/D");
-    Bad->Branch(Name, &m_AbsorptionProbabilityToFirstIAMinimum[c], Name + "/D");
-    
-    m_ZenithAngle.push_back(0);
-    Name = "ZenithAngle";
-    Good->Branch(Name, &m_ZenithAngle[c], Name + "/D");
-    Bad->Branch(Name, &m_ZenithAngle[c], Name + "/D");
-    
-    m_NadirAngle.push_back(0);
-    Name = "NadirAngle";
-    Good->Branch(Name, &m_NadirAngle[c], Name + "/D");
-    Bad->Branch(Name, &m_NadirAngle[c], Name + "/D");
-    
-    m_TreeGood.push_back(Good);
-    m_TreeBad.push_back(Bad);
+  m_Methods.ResetUsedMethods();
+  if (m_Methods.SetUsedMethods(m_MethodsString) == false) {
+    merr<<"Having troubles to set the used TMVA methods."<<endl;
+    return false;
   }
   
-
-  m_SaveAfter = numeric_limits<unsigned long>::max();
+  if (m_Methods.GetNumberOfUsedMethods() == 0) {
+    merr<<"No TMVA methods set."<<endl;
+    return false;
+  }
   
-  return true;
-}
+  // First find good and bad file name
+  MString GoodFileName;
+  MString BadFileName;
+  if (m_DataFileName.EndsWith(".good.root") == true) {
+    GoodFileName = m_DataFileName;
+    BadFileName = GoodFileName;
+    BadFileName.ReplaceAtEndInPlace(".good.root", ".bad.root");
+  } else if (m_DataFileName.EndsWith(".bad.root") == true) {
+    BadFileName = m_DataFileName;
+    GoodFileName = BadFileName;
+    GoodFileName.ReplaceAtEndInPlace(".bad.root", ".good.root");
+  } else {
+    merr<<"Unable to identify file name suffix of file \""<<m_DataFileName<<"\". Make sure it is either *.good.root or *.bad.root"<<endl;
+    return false;
+  }
+  
+  // Second find all the files for different sequence lengths
+  size_t Index = GoodFileName.FindLast(".seq");
+  MString Prefix = GoodFileName.GetSubString(0, Index);
+  for (unsigned int s = 2; s <= m_MaxNInteractions; ++s) {
+    MString Good = Prefix + ".seq" + s + ".good.root";
+    MString Bad = Prefix + ".seq" + s + ".bad.root";
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-bool MResponseMultipleComptonTMVA::Save()
-{
-  // Nothing here, only save at the end
+    MFile::ExpandFileName(Good);
+    MFile::ExpandFileName(Bad);
+    
+    cout<<"Good: "<<Good<<" vs. "<<Bad<<endl;
+    
+    if (MFile::Exists(Good) && MFile::Exists(Bad)) {
+      m_GoodFileNames.push_back(Good); 
+      m_BadFileNames.push_back(Bad);
+      m_SequenceLengths.push_back(s);
+      mout<<"Found sequence "<<s<<" data"<<endl;
+    }
+  }
+  if (m_GoodFileNames.size() == 0) {
+    merr<<"No usable good/bad data files found"<<endl;
+    return false;
+  }
+  
+  // Create output directory
+  MString OutDir = m_ResponseName;
+  if (MFile::FileExists(OutDir) == true) {
+    merr<<"Cannot create output directory"<<endl;
+    return false;   
+  }
+  gSystem->mkdir(OutDir);  
+  
+  // Create steering file
+  ofstream out;
+  out.open(m_ResponseName + ".tmva");
+  out<<"# TMVA steering file"<<endl;
+  out<<endl;
+  out<<"# Sequence length, 2..x"<<endl;
+  out<<"SL ";
+  for (unsigned int s: m_SequenceLengths) {
+    out<<s<<" ";
+  }
+  out<<endl;
+  out<<endl;
+  out<<"# Trained Algorithms (e.g. MLP, BDTD, PDEFoamBoost, DNN_GPU, DNN_CPU)"<<endl;
+  out<<"TA "<<m_Methods.GetUsedMethodsString()<<endl;
+  out<<endl;  
+  out<<"# Directory name"<<endl;
+  out<<"DN "<<m_ResponseName<<endl;
+  out<<endl;
+  out.close();
+  
+  gSystem->ChangeDirectory(m_ResponseName);
   
   return true;
 }
@@ -259,535 +172,222 @@ bool MResponseMultipleComptonTMVA::Save()
 
 bool MResponseMultipleComptonTMVA::Analyze()
 {
-  // Create the multiple Compton response
+  // Everything happens here
   
-  // Initlize next matching event, save if necessary
-  if (MResponseBuilder::Analyze() == false) return false;
+  unsigned int NThreads = m_GoodFileNames.size();
+  unsigned int MaxThreadsRunning = 1; // thread::hardware_concurrency() / 2;
+  vector<thread> Threads(m_GoodFileNames.size());
+  m_ThreadRunning.resize(m_GoodFileNames.size(), false);
   
-  // Go ahead event by event and compare the results: 
-  MRERawEvent* RE = nullptr;
-  MRawEventList* REList = m_ReReader->GetRawEventList();
-  vector<MRESE*> RESEs;
+  // We start with the longest running threads at higher sequence length
+  //for (unsigned int t = NThreads-1; t < NThreads; --t) {
+  for (unsigned int t = 0; t < NThreads; ++t) {
+      // Start a thread
+    m_ThreadRunning[t] = true;
+    Threads[t] = thread(&MResponseMultipleComptonTMVA::AnalysisThreadEntry, this, t);
+    // 5 seconds to give it a chance to fully initialize
+    this_thread::sleep_for(chrono::milliseconds(5000)); 
+    // sleep if we have more than the max allowed threads running
+    unsigned int Running = 0;
+    
+    if (t == NThreads-1) break;
+    do {
+      Running = 0;
+      for (unsigned int t = 0; t < NThreads; ++t) {
+        if (m_ThreadRunning[t] == true) {
+          Running++;
+        }
+      }
+      if (Running >= MaxThreadsRunning) {
+        //cout<<"Too many threads running ("<<Running<<") --- sleeping"<<endl; 
+        this_thread::sleep_for(chrono::milliseconds(100)); 
+      }
+      
+    } while (Running >= MaxThreadsRunning);
+  }
   
-  
-  // Current event parameters
-  vector<MRESE*> SequencedRESEs;
-  vector<int> SequencedRESEsIDs;
-  bool StartResolved = false;
-  bool CompletelyAbsorbed = false;
-  
-  unsigned int SequenceLength = 0;
-  
-  
-  int r_max = REList->GetNRawEvents();
-  for (int r = 0; r < r_max; ++r) {
-    RE = REList->GetRawEventAt(r);
-    
-    //cout<<"Start (ID: "<<RE->GetEventId()<<")"<<endl;
-    
-    // Check if complete sequence is ok:
-    SequenceLength = (unsigned int) RE->GetNRESEs();
-    
-    // Step 1:
-    // Some initial selections:
-    if (SequenceLength <= 1) {
-      mdebug<<"CreateResponse: Not enough hits: "<<SequenceLength<<endl;
-      continue;
-    }
-    
-    if (SequenceLength > (unsigned int) m_CSRMaxLength) {
-      mdebug<<"CreateResponse: To many hits: "<<SequenceLength<<endl;
-      continue;
-    }
-    
-    if (g_Verbosity >= c_Chatty) { 
-      mout<<"Matched event (Sim ID: "<<RE->GetEventId()<<")"<<endl;
-      mout<<RE->ToString()<<endl;
-    }
-    
-    
-    // Step 2:
-    // Analyze the current event
-    RESEs.clear();
-    for (int i = 0; i < RE->GetNRESEs(); ++i) RESEs.push_back(RE->GetRESEAt(i));
-    SequencedRESEs.clear();
-    SequencedRESEs.resize(RESEs.size());
-    
-    StartResolved = FindCorrectSequence(RESEs, SequencedRESEs);
-    
-    // If we don't have sequenced RESEs at that point something went badly wrong with the event, so we skip it here
-    bool FoundNullPtr = false;
-    for (unsigned int i = 0; i < SequenceLength; ++i) {
-      if ( SequencedRESEs[i] == nullptr) {
-        FoundNullPtr = true;
+  // Wait until all have finished
+  while (true) {
+    bool Finished = true;
+    for (unsigned int t = 0; t < NThreads; ++t) {
+      if (m_ThreadRunning[t] == true) {
+        Finished = false;
         break;
       }
     }
-    if (FoundNullPtr == true) {
-      //mout<<"Event cannot be sequenced correctly (Sim ID: "<<RE->GetEventId()<<")"<<endl;
-      SequencedRESEs = RESEs;
-    }
-    
-    
-    CompletelyAbsorbed = AreCompletelyAbsorbed(RESEs, RE);
-    if (StartResolved == true && CompletelyAbsorbed == true) {
-      if (g_Verbosity >= c_Chatty) mout<<" --> Good event!"<<endl;
+    if (Finished == false) {
+      this_thread::sleep_for(chrono::milliseconds(100));
     } else {
-      if (g_Verbosity >= c_Chatty) mout<<" --> Bad event: completely aborbed: "<<(CompletelyAbsorbed ? "true" : "false")<<"  resolved: "<<(StartResolved ? "true" : "false")<<endl;
-      //continue;
-    }        
-    
-    
-    // Build a tree element for all permutations:
-    
-    for (unsigned int p = 0; p < m_Permutator[SequenceLength].size(); ++p) {
-      
-      m_SimulationIDs[SequenceLength-2] = RE->GetEventId();
-      
-      // (a) Raw data:
-      for (unsigned int r = 0; r < SequenceLength; ++r) {
-        m_Energies[SequenceLength-2][r] = SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetEnergy();
-        m_PositionsX[SequenceLength-2][r] = SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetPosition().X();
-        m_PositionsY[SequenceLength-2][r] = SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetPosition().Y();
-        m_PositionsZ[SequenceLength-2][r] = SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetPosition().Z();
+      for (unsigned int t = 0; t < NThreads; ++t) {
+        Threads[t].join();
       }
-      
-      // (b) Compton scatter angle & Klein-Nishina
-      double EnergyIncomingGamma = RE->GetEnergy();
-      double EnergyElectron = 0.0;
-      double Phi = 0.0;
-      for (unsigned int r = 0; r < SequenceLength-1; ++r) {
-        EnergyElectron = SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetEnergy();
-        Phi = MComptonEvent::ComputePhiViaEeEg(EnergyElectron, EnergyIncomingGamma - EnergyElectron);
-        m_ComptonScatterAngles[SequenceLength-2][r] = Phi*c_Deg;
-        m_KleinNishinaProbability[SequenceLength-2][r] = MComptonEvent::GetKleinNishinaNormalizedByArea(EnergyIncomingGamma, Phi);
-        EnergyIncomingGamma -= EnergyElectron;
-        //if (p == 0 && StartResolved == true && CompletelyAbsorbed == true && Phi*c_Deg > 179.99) {
-        //  cout<<"Large Compton scatter angle (Sim ID: "<<RE->GetEventId()<<") -- Start:"<<SequencedRESEs[m_Permutator[SequenceLength][p][0]]->GetEnergy()<<endl;
-        //  mout<<RE->ToString()<<endl;
-        //}
-      }
-      
-      // (c) Compton scatter angle difference
-      for (unsigned int r = 0; r < SequenceLength-2; ++r) {
-        // Via Angle:
-        MVector FirstDir = SequencedRESEs[m_Permutator[SequenceLength][p][r+1]]->GetPosition() - SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetPosition();
-        MVector SecondDir = SequencedRESEs[m_Permutator[SequenceLength][p][r+2]]->GetPosition() - SequencedRESEs[m_Permutator[SequenceLength][p][r+1]]->GetPosition();
-        double PhiGeo = FirstDir.Angle(SecondDir);
-        m_ComptonScatterAngleDifference[SequenceLength-3][r] = PhiGeo*c_Deg - m_ComptonScatterAngles[SequenceLength-2][r+1]; // "-3" since we ponly start for 3-site events
-      }
-      
-      // (d) Absorption probabilities
-      EnergyIncomingGamma = RE->GetEnergy();
-      for (unsigned int r = 0; r < SequenceLength-1; ++r) {
-        EnergyIncomingGamma -= SequencedRESEs[m_Permutator[SequenceLength][p][r]]->GetEnergy();
-        
-        m_AbsorptionProbabilities[SequenceLength-2][r] = CalculateAbsorptionProbabilityTotal(*SequencedRESEs[m_Permutator[SequenceLength][p][r]], *SequencedRESEs[m_Permutator[SequenceLength][p][r+1]], EnergyIncomingGamma);
-      }
-      
-      // (e) Incoming probabilities
-      EnergyIncomingGamma = RE->GetEnergy();
-      Phi = m_ComptonScatterAngles[SequenceLength-2][0]*c_Rad;
-      MVector FirstIAPos = SequencedRESEs[m_Permutator[SequenceLength][p][0]]->GetPosition();
-      MVector SecondIAPos = SequencedRESEs[m_Permutator[SequenceLength][p][1]]->GetPosition();
-      MVector FirstScatteredGammaRayDir = SecondIAPos - FirstIAPos;
-      // Create a vector orthogonal to FirstScatteredGammaRayDir which we can use to create the first direction on the cone
-      MVector Ortho = FirstScatteredGammaRayDir.Orthogonal();
-      // Create the first direction on the cone by rotating FirstScatteredGammaRayDir by Phi around Ortho
-      MVector Incoming = FirstScatteredGammaRayDir;
-      Incoming.RotateAroundVector(Ortho, Phi);
-      
-      m_AbsorptionProbabilityToFirstIAAverage[SequenceLength-2] = 0.0;
-      m_AbsorptionProbabilityToFirstIAMaximum[SequenceLength-2] = 0.0;
-      m_AbsorptionProbabilityToFirstIAMinimum[SequenceLength-2] = numeric_limits<double>::max();
-      unsigned int Steps = 36;
-      double StepWidth = c_TwoPi/Steps;
-      for (unsigned int a = 0; a < Steps; ++a) {
-        MVector Outgoing = -Incoming;
-        Outgoing.RotateAroundVector(FirstScatteredGammaRayDir, a*StepWidth);
-        Outgoing.Unitize();
-        double P = m_SiGeometry->GetComptonAbsorptionProbability(FirstIAPos + 1000000*Outgoing, FirstIAPos, EnergyIncomingGamma);
-        m_AbsorptionProbabilityToFirstIAAverage[SequenceLength-2] += P;
-        if (P > m_AbsorptionProbabilityToFirstIAMaximum[SequenceLength-2]) {
-          m_AbsorptionProbabilityToFirstIAMaximum[SequenceLength-2] = P;
-        }
-        if (P < m_AbsorptionProbabilityToFirstIAMinimum[SequenceLength-2]) {
-          m_AbsorptionProbabilityToFirstIAMinimum[SequenceLength-2] = P;
-        }
-      }
-      m_AbsorptionProbabilityToFirstIAAverage[SequenceLength-2] /= Steps;
-      
-      // (f) Zenith and Nadir angles
-      MVector Zenith(0, 0, 1);
-      m_ZenithAngle[SequenceLength-2] = (FirstIAPos - SecondIAPos).Angle(Zenith - FirstIAPos) - Phi;
-      MVector Nadir(0, 0, -1);
-      m_NadirAngle[SequenceLength-2] = (FirstIAPos - SecondIAPos).Angle(Nadir - FirstIAPos) - Phi;
-      
-      
-      if (p == 0 && StartResolved == true && CompletelyAbsorbed == true) {
-        //cout<<"Add good"<<endl;
-        m_TreeGood[SequenceLength-2]->Fill();
-      } else {
-        //cout<<"Add bad"<<endl;
-        m_TreeBad[SequenceLength-2]->Fill();          
-      }
-    } // all permutations
-  } // All raw events
-
-  
-  return true;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-//! Finalize the response generation (i.e. save the data a final time )
-bool MResponseMultipleComptonTMVA::Finalize() 
-{ 
-  // We only save at the end since ROOT has trouble updating the file...
-  for (unsigned int t = 0; t < m_TreeGood.size(); ++t) {
-    TFile GoodOne(GetFilePrefix() + ".seq" + (t+2) + ".good.root", "recreate");
-    GoodOne.cd();
-    m_TreeGood[t]->Print();
-    m_TreeGood[t]->Write();
-    GoodOne.Close();
-    
-    TFile BadOne(GetFilePrefix() + ".seq" + (t+2) + ".bad.root", "recreate");
-    BadOne.cd();
-    m_TreeBad[t]->Write();
-    BadOne.Close();
-    
-    //m_TreeGood[t]->SaveAs(GetFilePrefix() + ".seq" + (t+2) + ".good.root");
-    //m_TreeBad[t]->SaveAs(GetFilePrefix() + ".seq" + (t+2) + ".bad.root");
+      break;
+    }
   }
+
   
-  return MResponseBuilder::Finalize(); 
+  return false; // since it does not need to be called again
 }
-
-
+  
+  
 ////////////////////////////////////////////////////////////////////////////////
-
-
-void MResponseMultipleComptonTMVA::Teach()
+  
+  
+void MResponseMultipleComptonTMVA::AnalysisThreadEntry(unsigned int ThreadID)
 {
-  // Teach the neural network the events
+  // We lock all the initializations
+  m_TheadMutex.lock();
+  cout<<"Launching thread "<<ThreadID<<endl;
   
- 
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-bool MResponseMultipleComptonTMVA::AreCompletelyAbsorbed(const vector<MRESE*>& RESEs, MRERawEvent* RE)
-{
-  // Return true if ALL individual RESEs are completely absorbed
-  // AND the photon from the start of the event!
+  MTime Now;
+  MString TimeString = Now.GetShortString();
+  
+  unsigned int SequenceLength = m_SequenceLengths[ThreadID];
+  
+  MString ResultsFileName = m_ResponseName + ".seq" + SequenceLength + ".root";
+  TFile* Results = new TFile(ResultsFileName, "recreate");
+  
+  
+  TFile* SourceFile = new TFile(m_GoodFileNames[ThreadID]); 
+  TTree* SourceTree = (TTree*) SourceFile->Get("Good");
+  if (SourceTree == nullptr) {
+    merr<<"Unable to read good events tree from file "<<m_GoodFileNames[ThreadID]<<endl;
+    return;
+  }
+  
+  TFile* BackgroundFile = new TFile(m_BadFileNames[ThreadID]); 
+  TTree* BackgroundTree = (TTree*) BackgroundFile->Get("Bad");
+  if (BackgroundTree == nullptr) {
+    merr<<"Unable to read bad events tree from file "<<m_BadFileNames[ThreadID]<<endl;
+    return;
+  }
+  
+  // The background tree could be much larger than the source
+  // If it is more than twice as large create a smaller tree for training
+  
+  unsigned long SourceTreeSize = SourceTree->GetEntries();
+  unsigned long BackgroundTreeSize = BackgroundTree->GetEntries();  
+  
+  cout<<"Tree sizes: background: "<<BackgroundTreeSize<<"  source: "<<SourceTreeSize<<endl;
+  
+  if (SourceTreeSize > m_MaxNEvents) {
+    cout<<"Reducing source tree size from "<<SourceTreeSize<<" to "<<m_MaxNEvents<<" (i.e. the maximum set)"<<endl;
+    TTree* NewSourceTree = SourceTree->CloneTree(0);
+    NewSourceTree->SetDirectory(0);
     
-  vector<int> AllOriginIds;
-  
-  for (unsigned int i = 0; i < RESEs.size(); ++i) {
-    vector<int> OriginIds = GetOriginIds(RESEs[i]);
-    if (IsAbsorbed(OriginIds, RESEs[i]->GetEnergy(), RESEs[i]->GetEnergyResolution()) == false) {
-      if (g_Verbosity >= c_Chatty) mout<<"RESE "<<RESEs[i]->GetID()<<" is not completely absorbed!"<<endl;
-      return false;
+    for (unsigned long i = 0; i < m_MaxNEvents; ++i) {
+      SourceTree->GetEntry(i);
+      NewSourceTree->Fill();
     }
-    for (unsigned int j = 0; j < OriginIds.size(); ++j) {
-      if (find(AllOriginIds.begin(), AllOriginIds.end(), OriginIds[j]) == AllOriginIds.end()) {
-        AllOriginIds.push_back(OriginIds[j]);
-      }
+    
+    SourceFile->Close();
+    SourceTree = NewSourceTree;
+    SourceTreeSize = m_MaxNEvents;
+  }  
+  
+  if (BackgroundTreeSize > SourceTreeSize) {
+    cout<<"Reducing background tree size from "<<BackgroundTreeSize<<" to "<<SourceTreeSize<<" (the source tree size)"<<endl;
+    TTree* NewBackgroundTree = BackgroundTree->CloneTree(0);
+    NewBackgroundTree->SetDirectory(0);
+    
+    for (unsigned long i = 0; i < SourceTreeSize; ++i) {
+      BackgroundTree->GetEntry(i);
+      NewBackgroundTree->Fill();
     }
-  }
+    
+    BackgroundFile->Close();
+    BackgroundTree = NewBackgroundTree;
+  }  
   
-  if (IsTotalAbsorbed(AllOriginIds, RE->GetEnergy(), RE->GetEnergyResolution()) == false) {
-    if (g_Verbosity >= c_Chatty) mout<<"Whole event "<<RE->GetID()<<" is not completely absorbed!"<<endl;
-    return false;
-  }
+  TMVA::Factory *factory = new TMVA::Factory("TMVAClassification", Results,
+                                             "!V:!Silent:Color:DrawProgressBar:Transformations=I:AnalysisType=Classification" );
+  //                                             "!V:!Silent:Color:DrawProgressBar:Transformations=I;D;P;G,D:AnalysisType=Classification" );
   
+  MString OutDir("N");
+  OutDir += SequenceLength;
+  TMVA::DataLoader *dataloader = new TMVA::DataLoader(OutDir.Data());
   
-  return true;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-bool MResponseMultipleComptonTMVA::FindFirstInteractions(const vector<MRESE*>& RESEs, MRESE*& First, MRESE*& Second)
-{
-  // Return true if those were found
-  // 
-  // First and second are the *detected* first and second interaction ---
-  // there may be some undetected before and in between
+  m_TheadMutex.unlock();
   
-  //mout<<"FindFirstInteractions"<<endl;
+  vector<TString> IgnoredBranches = { "SimulationIDs" }; //, "AbsorptionProbabilityToFirstIAAverage", "AbsorptionProbabilityToFirstIAMaximum",  "AbsorptionProbabilityToFirstIAMinimum", "ZenithAngle", "NadirAngle" };
   
-  First = 0;
-  Second = 0;
-  
-  // Determine for all RESEs the Origin IDs
-  vector<vector<int>> OriginIds;
-  for (unsigned int r = 0; r < RESEs.size(); ++r) {
-    OriginIds.push_back(GetOriginIds(RESEs[r]));
-  }
-  
-  // Motherparticle of smallest ID - needs to be a photon!
-  int Smallest = numeric_limits<int>::max();
-  for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-    for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-      if (OriginIds[i][j] < Smallest) Smallest = OriginIds[i][j];
+  TObjArray* Branches = SourceTree->GetListOfBranches();
+  for (int b = 0; b < Branches->GetEntries(); ++b) {
+    TBranch* B = dynamic_cast<TBranch*>(Branches->At(b));
+    TString Name = B->GetName();
+    if (find(IgnoredBranches.begin(), IgnoredBranches.end(), Name) == IgnoredBranches.end()) {
+      dataloader->AddVariable(Name, 'F');
     }
   }
   
-  if (m_SiEvent->GetIAAt(Smallest-1)->GetOrigin() == 0) {
-    if (m_SiEvent->GetIAAt(Smallest-1)->GetType() != "ANNI" &&
-      m_SiEvent->GetIAAt(Smallest-1)->GetType() != "INIT") {
-      if (g_Verbosity >= c_Chatty) mout<<"FindFirstInteractions: IA Type not OK: "<<m_SiEvent->GetIAAt(Smallest-1)->GetType()<<endl;
-      return false;
-    }
-  } else {
-    if (m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetType() != "ANNI" &&
-      m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetType() != "INIT") {
-      if (g_Verbosity >= c_Chatty) mout<<"FindFirstInteractions: IA Type not OK: "<<m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetType()<<endl;
-      return false;
-    }
-  }
-  
-  if (m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetParticleNumber() == 1) {
-    // Find one and only RESE associated with this:
-    for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-      for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-        if (OriginIds[i][j] == Smallest) {
-          if (First == 0) {
-            First = RESEs[i];
-          } else {
-            // If we have more than one RESE associated with this, then we have no clear first hit 
-            // and have to reject...
-            if (g_Verbosity >= c_Chatty) mout<<"FindFirstInteractions: First: RESE "<<First->GetID()<<" and "<<RESEs[i]->GetID()<<" are associated with start IA "<<Smallest<<endl;
-            return false;
-          }
-        }
-      }
-    }
-  } else {
-    // Only photons can be good...
-    if (g_Verbosity >= c_Chatty) mout<<"FindFirstInteractions: IA which triggered first RESE is no photon: "<<m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetParticleNumber()<<endl;
-    return false;
-  }
-  
-  // Go through the main event tree in the file and find the RESEs:
-  for (unsigned int s = Smallest+1; s < m_SiEvent->GetNIAs(); ++s) {
-    // The second event in the sequence needs to have the same origin than the first one
-    if (m_SiEvent->GetIAAt(Smallest)->GetOrigin() == m_SiEvent->GetIAAt(s)->GetOrigin()) {
-      for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-        for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-          if (OriginIds[i][j] == int(s) && RESEs[i] != First) {
-            if (Second == 0) {
-              Second = RESEs[i];
-            } else {
-              // If we have more than one RESE associated with this, then we have no clear first hit 
-              // and have to reject...
-              if (g_Verbosity >= c_Chatty) mout<<"FindFirstInteractions: Second: RESE "<<Second->GetID()<<" and "<<RESEs[i]->GetID()<<" are associated with current IA "<<i<<endl;
-              return false;
-            }
-          }
-        }
-      }
-      if (Second != 0) break;
-    }
-  }
-  
-  if (First == 0 || Second == 0) {
-    if (g_Verbosity >= c_Chatty) mout<<"FindFirstInteractions: Did not find first and second!"<<endl;
-    return false;
-  }
-  
-  //cout<<"First RESE: "<<First->GetID()<<", Second RESE: "<<Second->GetID()<<endl;
-  
-  return true;
-}
+  dataloader->AddSignalTree(SourceTree, 1.0);
+  dataloader->AddBackgroundTree(BackgroundTree, 1.0);
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-bool MResponseMultipleComptonTMVA::FindCorrectSequence(const vector<MRESE*>& RESEs, vector<MRESE*>& SequencedRESEs)
-{
-  // Return true if those were found
-  // 
-  // First and second are the *detected* first and second interaction ---
-  // there may be some undetected before and in between
+  // Random splitting, new seed each time, verbose output 
+  TString Prep = "SplitMode=Random:SplitSeed=0:V";
+  dataloader->PrepareTrainingAndTestTree("", Prep);
   
-  //mout<<"FindFirstInteractions"<<endl;
-  
-  SequencedRESEs.resize(RESEs.size());
-  for (unsigned int i = 0; i < SequencedRESEs.size(); ++i) SequencedRESEs[i] = 0;
-  
-  // Determine for all RESEs the Origin IDs
-  vector<vector<int>> OriginIds;
-  for (unsigned int r = 0; r < RESEs.size(); ++r) {
-    OriginIds.push_back(GetOriginIds(RESEs[r]));
+  // Standard MLP
+  if (m_Methods.IsUsedMethod(MERCSRTMVAMethod::c_MLP) == true) {
+    // New seed each run via RandomSeed=0
+    factory->BookMethod( dataloader, TMVA::Types::kMLP, "MLP", "H:!V:NeuronType=tanh:VarTransform=N:NCycles=1c00:HiddenLayers=N+5:TestRate=5:RandomSeed=0:!UseRegulator" );
   }
   
-  // Motherparticle of smallest ID - needs to be a photon!
-  int Smallest = numeric_limits<int>::max();
-  for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-    for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-      if (OriginIds[i][j] < Smallest) Smallest = OriginIds[i][j];
-    }
+  // Boosted decision tree: Decorrelation + Adaptive Boost
+  if (m_Methods.IsUsedMethod(MERCSRTMVAMethod::c_BDTD) == true) {
+    factory->BookMethod( dataloader, TMVA::Types::kBDT, "BDTD", "!H:!V:NTrees=400:MinNodeSize=5%:MaxDepth=3:BoostType=AdaBoost:SeparationType=GiniIndex:nCuts=20:VarTransform=Decorrelate" );
   }
   
-  // What about BREM
-  if (m_SiEvent->GetIAAt(Smallest-1)->GetOrigin() == 0) {
-    if (m_SiEvent->GetIAAt(Smallest-1)->GetType() != "ANNI" && m_SiEvent->GetIAAt(Smallest-1)->GetType() != "INIT") {
-      if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: IA Type not OK: "<<m_SiEvent->GetIAAt(Smallest-1)->GetType()<<endl;
-        return false;
-      }
-    } else {
-      if (m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetType() != "ANNI" &&
-          m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetType() != "INIT") {
-        if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: IA Type not OK: "<<m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetType()<<endl;
-        return false;
-      }
-    }
-  
-  if (m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetParticleNumber() == 1) {
-    // Find one and only RESE associated with this:
-    for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-      for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-        if (OriginIds[i][j] == Smallest) {
-          if (SequencedRESEs[0] == 0) {
-            SequencedRESEs[0] = RESEs[i];
-          } else {
-            // If we have more than one RESE associated with this, then we have no clear first hit 
-            // and have to reject...
-            if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: First: RESE "<<SequencedRESEs[0]->GetID()<<" and "<<RESEs[i]->GetID()<<" are associated with start IA "<<Smallest<<endl;
-            return false;
-          }
-        }
-      }
-    }
-  } else {
-    // Only photons can be good...
-    if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: IA which triggered first RESE is no photon: "<<m_SiEvent->GetIAAt(m_SiEvent->GetIAAt(Smallest-1)->GetOrigin()-1)->GetParticleNumber()<<endl;
-    return false;
+  if (m_Methods.IsUsedMethod(MERCSRTMVAMethod::c_PDEFoamBoost) == true) {
+    factory->BookMethod( dataloader, TMVA::Types::kPDEFoam, "PDEFoamBoost","!H:!V:Boost_Num=30:Boost_Transform=linear:SigBgSeparate=F:MaxDepth=4:UseYesNoCell=T:DTLogic=MisClassificationError:FillFoamWithOrigWeights=F:TailCut=0:nActiveCells=500:nBin=20:Nmin=400:Kernel=None:Compress=T" );
   }
   
-  //mout<<"FindCorrectSequence: First RESE "<<SequencedRESEs[0]->GetID()<<" (Smallest: "<<Smallest<<")"<<endl;
+  /*
+  if (m_Methods["PDERSPCA"] == 1) {
+    factory->BookMethod( dataloader, TMVA::Types::kPDERS, "PDERSPCA", "!H:!V:VolumeRangeMode=Adaptive:KernelEstimator=Gauss:GaussSigma=0.3:NEventsMin=400:NEventsMax=600:VarTransform=PCA" );
+  }
+  */
   
-  // Check if there is a Compton is missing...
-  for (unsigned int s = Smallest; s < m_SiEvent->GetNIAs(); ++s) {
-    // The second event in the sequence needs to have the same origin than the first one
-    if (m_SiEvent->GetIAAt(Smallest)->GetOrigin() == m_SiEvent->GetIAAt(s)->GetOrigin() &&
-      m_SiEvent->GetIAAt(s)->GetType() == "COMP") {
-      //cout<<m_SiEvent->GetIAAt(s)->GetEnergy()<<endl;
-      bool Found = false;
-      for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-        for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-          //cout<<int(s+1)<<":"<<OriginIds[i][j]<<endl;
-          if (OriginIds[i][j] == int(s+1)) {
-            Found = true;
-            break;
-          }
-        }
-      }
-      if (Found == false) {
-        if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: Gap! Cannot find representant for Compton ID "<<s+1<<endl;
-        return false;
-      }
-    }
+  // General layout.
+  TString layoutString ("Layout=RELU|2*N,LINEAR");
+  
+  // Training strategies.
+  TString training0("LearningRate=1e-2,Momentum=0.5,Repetitions=1,ConvergenceSteps=1000,BatchSize=1024,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.0, Multithreading=True");
+  //TString training0("LearningRate=1e-1,Momentum=0.9,Repetitions=1,ConvergenceSteps=1000,BatchSize=256,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.5+0.5+0.5, Multithreading=True");
+  TString training1("LearningRate=1e-3,Momentum=0.5,Repetitions=1,ConvergenceSteps=1000,BatchSize=256,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.0+0.0+0.0, Multithreading=True");
+  //TString training2("LearningRate=1e-3,Momentum=0.0,Repetitions=1,ConvergenceSteps=1000,BatchSize=256,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.0+0.0+0.0, Multithreading=True");
+  TString trainingStrategyString ("TrainingStrategy=");
+  trainingStrategyString += training0; // + "|" + training1; // + "|" + training2;
+  
+  // General Options.
+  TString dnnOptions ("!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM");
+  dnnOptions.Append (":"); dnnOptions.Append (layoutString);
+  dnnOptions.Append (":"); dnnOptions.Append (trainingStrategyString);
+  
+  // Cuda implementation.
+  if (m_Methods.IsUsedMethod(MERCSRTMVAMethod::c_DNN_GPU) == true) {
+    TString gpuOptions = dnnOptions + ":Architecture=GPU";
+    factory->BookMethod(dataloader, TMVA::Types::kDNN, "DNN_GPU", gpuOptions);
   }
   
-  // Go through the main event tree in the file and find the RESE sequence:
-  unsigned int FreeSpotInSequencedRESEs = 1;
-  for (unsigned int s = Smallest; s < m_SiEvent->GetNIAs(); ++s) {
-    // The second event in the sequence needs to have the same origin than the first one
-    if (m_SiEvent->GetIAAt(Smallest)->GetOrigin() == m_SiEvent->GetIAAt(s)->GetOrigin()) {
-      // Loop over all RESEs
-      for (unsigned int i = 0; i < OriginIds.size(); ++i) {
-        // If the current RESE is not yet in the list:
-        if (find(SequencedRESEs.begin(), SequencedRESEs.end(), RESEs[i]) == SequencedRESEs.end()) {
-          for (unsigned int j = 0; j < OriginIds[i].size(); ++j) {
-            if (OriginIds[i][j] == int(s)) {
-              SequencedRESEs[FreeSpotInSequencedRESEs] = RESEs[i];
-              //mout<<"FindCorrectSequence: next RESE "<<SequencedRESEs[FreeSpotInSequencedRESEs]->GetID()<<endl;
-              FreeSpotInSequencedRESEs++;
-            }
-          }
-        }
-      }
-    }
+  // Multi-core CPU implementation.
+  if (m_Methods.IsUsedMethod(MERCSRTMVAMethod::c_DNN_CPU) == true) {
+    TString cpuOptions = dnnOptions + ":Architecture=CPU";
+    factory->BookMethod(dataloader, TMVA::Types::kDNN, "DNN_CPU", cpuOptions);
   }
   
-  // Check if in all but the last interaction only contain a Compton interaction and it's possible dependents:
-  for (unsigned int s = 0; s < SequencedRESEs.size()-1; ++s) {
-    if (SequencedRESEs[s] != 0) {
-      vector<int> SequencedRESEsIDs = GetOriginIds(SequencedRESEs[s]);
-      if (ContainsOnlyComptonDependants(SequencedRESEsIDs) == false) {
-        if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: Not only Compton (+ dependents) in interaction "<<SequencedRESEs[s]->GetID()<<endl;
-        return false;
-      }
-      if (NumberOfComptonInteractions(SequencedRESEsIDs) != 1) {
-        if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: Not exactly one Compton in interaction "<<SequencedRESEs[s]->GetID()<<endl;
-        return false;        
-      }
-      //mout<<"FindCorrectSequence: All Compton "<<SequencedRESEs[s]->GetID()<<endl;
-    }
-  }
+  factory->TrainAllMethods();
+  factory->TestAllMethods();
+  factory->EvaluateAllMethods();
   
-  //   mout<<"Sequence: ";
-  //   for (unsigned int s = 0; s < SequencedRESEs.size(); ++s) {
-  //     if (SequencedRESEs[s] == 0) {
-  //       mout<<" ?";
-  //     } else {
-  //       mout<<" "<<SequencedRESEs[s]->GetID();
-  //     }
-  //   }
-  //   mout<<endl;
+  Results->Close();
   
-  for (unsigned int s = 0; s < SequencedRESEs.size(); ++s) {
-    if (SequencedRESEs[s] == 0) {
-      if (g_Verbosity >= c_Chatty) mout<<"FindCorrectSequence: Did not find complete sequence!"<<endl;
-      return false;
-    }
-  }
-  
-  return true;
-}
+  delete factory;
+  delete dataloader;
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-unsigned int MResponseMultipleComptonTMVA::NumberOfComptonInteractions(vector<int> AllSimIds)
-{
-  unsigned int N = 0;
-  
-  for (unsigned int i = 0; i < AllSimIds.size(); ++i) {
-    if (m_SiEvent->GetIAAt(AllSimIds[i]-1)->GetType() == "COMP") {
-      N++;
-    }
-  }
-  
-  return N;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-void MResponseMultipleComptonTMVA::Shuffle(vector<MRESE*>& RESEs)
-{
-  //! Shuffle the RESEs around...
-  
-  unsigned int size = RESEs.size();
-  for (unsigned int i = 0; i < 2*size; ++i) {
-    unsigned int From = gRandom->Integer(size);
-    unsigned int To = gRandom->Integer(size);
-    MRESE* Temp = RESEs[To];
-    RESEs[To] = RESEs[From];
-    RESEs[From] = Temp;
-  }
+  m_TheadMutex.lock();
+  m_ThreadRunning[ThreadID] = false;
+  m_TheadMutex.unlock();
 }
 
 

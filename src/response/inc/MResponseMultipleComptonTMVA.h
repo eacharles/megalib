@@ -18,6 +18,7 @@
 
 // Standard libs:
 #include <vector>
+#include <mutex>
 using namespace std;
 
 // ROOT libs:
@@ -29,6 +30,7 @@ using namespace std;
 #include "MRESE.h"
 #include "MRERawEvent.h"
 #include "MRETrack.h"
+#include "MERCSRTMVAMethods.h"
 
 // Forward declarations:
 
@@ -45,39 +47,22 @@ class MResponseMultipleComptonTMVA : public MResponseMultipleCompton
   //! Default destructor
   virtual ~MResponseMultipleComptonTMVA();
   
+  //! Set TMVA methods striung -- parsing happens in Initialize()
+  void SetMethods(MString MethodsString) { m_MethodsString = MethodsString; }
+  
   //! Initialize the response matrices and their generation
   virtual bool Initialize();
   
   //! Analyze th events (all if in file mode, one if in event-by-event mode)
   virtual bool Analyze();
   
-  //! Finalize the response generation (i.e. save the data a final time )
-  virtual bool Finalize();
-  
   // protected methods:
  protected:
-   
+  //! Entry point for the deconvolution thread
+  virtual void AnalysisThreadEntry(unsigned int ThreadID);
+  
   //! Save the response matrices
-  virtual bool Save();
-
-  //! Store one element
-  bool Store(unsigned int SequenceLength, bool IsGood);
-  
-  
-  //! Find the first two interaction in the simulated event
-  bool FindFirstInteractions(const vector<MRESE*>& RESEs, MRESE*& First, MRESE*& Second);
-  //! Find the correct interaction sequence, or return false if non can be found  
-  bool FindCorrectSequence(const vector<MRESE*>& RESEs, vector<MRESE*>& Sorted);
-  //! Return true if all RESEs are completely aborbed within the given measurement uncertainties
-  bool AreCompletelyAbsorbed(const vector<MRESE*>& RESEs, MRERawEvent* RE);
-  //! Return the number of Compton interactions
-  unsigned int NumberOfComptonInteractions(vector<int> AllSimIds);
-
-  //! Shuffle the RESEs around...
-  void Shuffle(vector<MRESE*>& RESEs);
-
-  //! Teach the neural network the events
-  void Teach();
+  virtual bool Save() { return true; }   
 
   // private methods:
  private:
@@ -86,50 +71,23 @@ class MResponseMultipleComptonTMVA : public MResponseMultipleCompton
 
   // protected members:
  protected:
+  //! The used TMVA methods
+  MERCSRTMVAMethods m_Methods;
+  //! The methods string
+  MString m_MethodsString;
+  
+  //! The good file names
+  vector<MString> m_GoodFileNames;
+  //! The bad file names
+  vector<MString> m_BadFileNames;
+  //! The sequence length
+  vector<unsigned int> m_SequenceLengths;
    
-  //! The data storage for good events, one per sequence length
-  vector<TTree*> m_TreeGood;
+  //! Flags indicating the threads are running:
+  vector<bool> m_ThreadRunning;
+  //! Thread parameter mutex
+  mutex m_TheadMutex;
    
-  //! The data storage for bad events
-  vector<TTree*> m_TreeBad;
-   
-  // The TTree input data for each possibility, one per sequence length:
-  
-  //! Simulation ID
-  vector<Long64_t> m_SimulationIDs;
-  //! Measured energies
-  vector<vector<double>> m_Energies;
-  //! Measured positions x
-  vector<vector<double>> m_PositionsX;
-  //! Measured positions y
-  vector<vector<double>> m_PositionsY;
-  //! Measured positions z
-  vector<vector<double>> m_PositionsZ;
-  //! The Compton scatter angles 
-  vector<vector<double>> m_ComptonScatterAngles;
-  //! The Compton scatter probability (KN)
-  vector<vector<double>> m_KleinNishinaProbability;
-  //! The Compton scatter scatter angle difference
-  vector<vector<double>> m_ComptonScatterAngleDifference;
-  //! The total absorption probabilities
-  vector<vector<double>> m_AbsorptionProbabilities;
-  //! The average column desnity to first IA
-  vector<double> m_AbsorptionProbabilityToFirstIAAverage;
-  //! The peak column desnity to first IA
-  vector<double> m_AbsorptionProbabilityToFirstIAMaximum;
-  //! The minimum column desnity to first IA
-  vector<double> m_AbsorptionProbabilityToFirstIAMinimum;
-  //! The Zenith angle
-  vector<double> m_ZenithAngle;
-  //! The Nadir angle
-  vector<double> m_NadirAngle;  
-  
-  //! All possible Permutations for fast access:
-  //! Build the following way: [Sequence length] [Permuation ID] [Index]
-  vector<vector<vector<unsigned int>>> m_Permutator;
-  
-
-  
 #ifdef ___CINT___
  public:
   ClassDef(MResponseMultipleComptonTMVA, 0) // no description

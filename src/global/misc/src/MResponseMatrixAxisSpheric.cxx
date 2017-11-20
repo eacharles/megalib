@@ -76,7 +76,7 @@ MResponseMatrixAxisSpheric* MResponseMatrixAxisSpheric::Clone() const
 
 
 //! Equality operator
-bool MResponseMatrixAxisSpheric::operator==(const MResponseMatrixAxisSpheric& Axis)
+bool MResponseMatrixAxisSpheric::operator==(const MResponseMatrixAxisSpheric& Axis) const
 {
   // We don't care about names, only the physical properties
   
@@ -191,6 +191,17 @@ vector<double> MResponseMatrixAxisSpheric::GetBinCenters(unsigned int Bin) const
   Centers[1] *= c_Deg;
   
   return Centers;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+//! Return the bin centera of all axis bins as vector
+//! Can throw: MExceptionIndexOutOfBounds
+vector<MVector> MResponseMatrixAxisSpheric::GetAllBinCenters() const
+{
+  return m_Binner.GetAllBinCenters();
 }
 
 

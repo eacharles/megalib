@@ -28,7 +28,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
-
+//! FISBEL: Fixed Integral ... Equi-longitude..?
 //! This is just the binner, it does not store any data itself
 class MBinnerFISBEL
 {
@@ -66,15 +66,18 @@ class MBinnerFISBEL
   //! Get the latitude bin edges (in degree)
   vector<double> GetLatitudeBinEdges() const { return m_LatitudeBinEdges; } 
   
-  //! Get the bin center (returns: theta, phi)
+  //! Get the bin center (returns: theta, phi in radians)
   //! Can throw: MExceptionIndexOutOfBounds
   vector<double> GetBinCenters(unsigned int Bin) const;
+  
+  //! Returns all bin centers as vector
+  vector<MVector> GetAllBinCenters() const;
   
   //! View the binning
   //! If the given vector has the correct dimension, it's data will be shown
   void View(vector<double> = {}) const;
   
-  //! Return axis bins edges for external drawing
+  //! Return axis bins edges for external drawing (1st array: longitude/phi, 2nd array: latitude/theta)
   vector<vector<double>> GetDrawingAxisBinEdges() const;
   
   // protected methods:

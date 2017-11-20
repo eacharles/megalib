@@ -66,7 +66,7 @@ using namespace std;
 #include "MERCSREnergyRecovery.h"
 #include "MERCSRToFWithEnergyRecovery.h"
 #include "MERCSRBayesian.h"
-#include "MERCSRNeuralNetwork.h"
+#include "MERCSRTMVA.h"
 #include "MERDecay.h"
 
 
@@ -105,7 +105,7 @@ const int MRawEventAnalyzer::c_CSRAlgoFoM           = 1;
 const int MRawEventAnalyzer::c_CSRAlgoFoME          = 2;
 const int MRawEventAnalyzer::c_CSRAlgoFoMToF        = 3;
 const int MRawEventAnalyzer::c_CSRAlgoBayesian      = 4;
-const int MRawEventAnalyzer::c_CSRAlgoNeuralNetwork = 5;
+const int MRawEventAnalyzer::c_CSRAlgoTMVA = 5;
 const int MRawEventAnalyzer::c_CSRAlgoFoMToFAndE    = 6;
 
 const int MRawEventAnalyzer::c_DecayAlgoNone     = 0;
@@ -141,7 +141,7 @@ MRawEventAnalyzer::MRawEventAnalyzer()
 
   m_MoreEventsAvailable = true;
 
-  m_InitialRawEvent = 0;
+  m_InitialRawEvent = nullptr;
 
   m_NEvents = 0;
   m_NPassedEventSelection = 0;
@@ -201,7 +201,7 @@ MRawEventAnalyzer::MRawEventAnalyzer()
 
   m_CSROnlyCreateSequences = false;
 
-  m_OriginGeometry = 0;
+  m_OriginGeometry = nullptr;
 
   m_OriginObjectsFileName = "";
 
@@ -349,7 +349,10 @@ void MRawEventAnalyzer::SetSettings(MSettingsEventReconstruction* S)
 
   SetBCTFileName(S->GetBayesianComptonFileName());
 
-  SetNeuralNetworkFileName(S->GetNeuralNetworkFileName());
+
+  SetTMVAFileName(S->GetTMVAFileName());
+  SetTMVAMethods(S->GetTMVAMethods());
+
 
   SetLensCenter(S->GetLensCenter());
   SetFocalSpotCenter(S->GetFocalSpotCenter());
@@ -420,7 +423,7 @@ bool MRawEventAnalyzer::SetInputModeFile(MString Filename)
 bool MRawEventAnalyzer::SetOutputModeFile(MString Filename)
 {
   delete m_PhysFile;
-  m_PhysFile = 0;
+  m_PhysFile = nullptr;
 
   if (Filename == "") {
     mout<<"MRawEventAnalyzer: No output file name given!"<<endl;
@@ -432,7 +435,7 @@ bool MRawEventAnalyzer::SetOutputModeFile(MString Filename)
   if (m_PhysFile->Open(m_FilenameOut, MFile::c_Write) == false) {
     mout<<"MRawEventAnalyzer: Unable to open output file \""<<m_FilenameOut<<"\""<<endl;
     delete m_PhysFile;
-    m_PhysFile = 0;
+    m_PhysFile = nullptr;
     return false;
   }
 
@@ -504,12 +507,12 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
   bool ClearStore = false;
 
   // A temporary raw event...
-  MRERawEvent* RE = 0;
+  MRERawEvent* RE = nullptr;
 
   // Read events if we have reader
-  if (m_Reader != 0) {
+  if (m_Reader != nullptr) {
     RE = m_Reader->GetNextEvent();
-    if (RE == 0) { // No more events left in file
+    if (RE == nullptr) { // No more events left in file
       ClearStore = true;
       if (m_EventStore->GetNRawEvents() == 0) {
         return c_AnalysisNoEventsLeftInFile;
@@ -531,12 +534,12 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
 
   // Section A: Coincidence search
   if (m_CoincidenceAlgorithm != c_CoincidenceAlgoNone) {
-    if (m_Coincidence == 0) {
+    if (m_Coincidence == nullptr) {
       merr<<"Coincidence pointer is zero. You changed the event reconstruction setup without calling PreAnalysis()!"<<show;
       return c_AnalysisUndefinedError;
     }
 
-    RE = 0;
+    RE = nullptr;
 
     // Search for coincidences
     if (ClearStore == true || m_EventStore->GetNRawEvents() >= 2) {
@@ -544,16 +547,16 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     }
 
     // When does this case happen???
-    if (RE == 0 && m_EventStore->GetNRawEvents() == 0) {
+    if (RE == nullptr && m_EventStore->GetNRawEvents() == 0) {
       return c_AnalysisNoEventsInStore;
     }
 
-    if (RE == 0) {
+    if (RE == nullptr) {
       return c_AnalysisCoincidenceWindowWait;
     }
 
     // Handle coincidences in the same voxel due to coincidence search - this should only happen in the simulation...
-    if (RE != 0 && m_CoincidenceAlgorithm != c_CoincidenceAlgoNone) {
+    if (RE != nullptr && m_CoincidenceAlgorithm != c_CoincidenceAlgoNone) {
       for (int r1 = 0; r1 < RE->GetNRESEs(); ++r1) {
         for (int r2 = r1+1; r2 < RE->GetNRESEs(); ++r2) {
           if (RE->GetRESEAt(r1)->GetPosition().AreEqual(RE->GetRESEAt(r2)->GetPosition(), 0.0000001) == true) {
@@ -575,7 +578,7 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     m_EventStore->RemoveRawEvent(RE);
   }
 
-  if (RE == 0) {
+  if (RE == nullptr) {
     merr<<"We don't have a raw event..."<<fatal;
     return c_AnalysisUndefinedError;
   }
@@ -588,9 +591,9 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
 
 
   // Store the inital coincident event:
-  if (m_InitialRawEvent != 0) {
+  if (m_InitialRawEvent != nullptr) {
     delete m_InitialRawEvent;
-    m_InitialRawEvent = 0;
+    m_InitialRawEvent = nullptr;
   }
   m_InitialRawEvent = RE->Duplicate();
 
@@ -637,7 +640,7 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     Timer.Start();
 
     if (SelectionsPassed == true && m_ClusteringAlgorithm > c_ClusteringAlgoNone) {
-      if (m_Clusterizer == 0) {
+      if (m_Clusterizer == nullptr) {
         merr<<"Clusterizer pointer is zero. You changed the event reconstruction setup without calling PreAnalysis()!"<<show;
         return c_AnalysisUndefinedError;
       }
@@ -658,7 +661,7 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     // Section C: Tracking:
     Timer.Start();
     if (SelectionsPassed == true && m_TrackingAlgorithm > c_TrackingAlgoNone) {
-      if (m_Tracker == 0) {
+      if (m_Tracker == nullptr) {
         merr<<"Tracker pointer is zero. You changed the event reconstruction setup without calling PreAnalysis()!"<<show;
         return c_AnalysisUndefinedError;
       }
@@ -695,7 +698,7 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
       // Section D: Compton sequence reconstruction
       Timer.Start();
       if (SelectionsPassed == true && m_RawEvents->HasOptimumEvent() == false && m_CSRAlgorithm > c_CSRAlgoNone) {
-        if (m_CSR == 0) {
+        if (m_CSR == nullptr) {
           merr<<"CSR pointer is zero. You changed the event reconstruction setup without calling PreAnalysis()!"<<show;
           return c_AnalysisUndefinedError;
         }
@@ -724,12 +727,13 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     }
 
     // If we have a good event, then write it
-    if (m_RawEvents->HasOptimumEvent() == true && m_PhysFile != 0) {
+    if (m_RawEvents->HasOptimumEvent() == true && m_PhysFile != nullptr) {
       mdebug<<m_RawEvents->GetOptimumEvent()->ToString()<<endl;
       // Write the event:
       MPhysicalEvent* Event = m_RawEvents->GetOptimumEvent()->GetPhysicalEvent();
 
-      if (m_PhysFile != 0) {
+      if (m_PhysFile != nullptr) {
+
         if (m_PhysFile->AddEvent(Event) == false) {
           merr<<"Saving the event failed!"<<show;
           return c_AnalysisSavingEventFailed;
@@ -761,15 +765,15 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
         merr<<"ER - Unhandled event type: "<<Event->GetType()<<endl;
       }
     } else {
-      MRERawEvent* BestTry = 0;
-      if (m_RawEvents->GetBestTryEvent() != 0) {
+      MRERawEvent* BestTry = nullptr;
+      if (m_RawEvents->GetBestTryEvent() != nullptr) {
         BestTry = m_RawEvents->GetBestTryEvent();
       } else if (m_RawEvents->GetNRawEvents() > 0) {
         mdebug<<"ER - Multiple raw events and no best one ... grummel ... Grabbing the last one for rejection reason statistics ..."<<endl;
         BestTry = m_RawEvents->GetRawEventAt(m_RawEvents->GetNRawEvents()-1);
       }
 
-      if (BestTry != 0) {
+      if (BestTry != nullptr) {
         mdebug<<"ER - Second best event structure..."<<endl;
         mdebug<<BestTry->ToString()<<endl;
         while (m_Rejections.size() < (unsigned int) BestTry->GetRejectionReason()+1) {
@@ -780,7 +784,7 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
             <<MRERawEvent::GetRejectionReasonAsString(BestTry->GetRejectionReason())<<endl;
 
         MPhysicalEvent* Event = BestTry->GetPhysicalEvent();
-        if (m_PhysFile != 0) {
+        if (m_PhysFile != nullptr) {
           if (m_PhysFile->AddEvent(Event) == false) {
             merr<<"Saving the event failed!"<<show;
             return c_AnalysisSavingEventFailed;
@@ -810,9 +814,9 @@ MRERawEvent* MRawEventAnalyzer::GetNextInitialRawEventFromFile()
 {
   // Return the next initial raw event
   // This loops over all events
-  // If the return value == 0 then no more eventa are available
+  // If the return value == nullptr then no more events are available
 
-  if (m_Reader == 0) return 0;
+  if (m_Reader == nullptr) return nullptr;
 
   return m_Reader->GetNextEvent();
 }
@@ -892,8 +896,7 @@ void MRawEventAnalyzer::JoinStatistics(const MRawEventAnalyzer& A)
 bool MRawEventAnalyzer::PostAnalysis()
 {
   // No more events available
-
-  if (m_PhysFile != 0) {
+  if (m_PhysFile != nullptr) {
     m_PhysFile->SetObservationTime(m_Reader->GetObservationTime());
   }
 
@@ -911,19 +914,19 @@ bool MRawEventAnalyzer::PostAnalysis()
   out<<"# Date "<<T.GetSQLString()<<endl;
   out<<"# OriginalFile "<<m_Filename<<endl;
   out<<"# GeometryFile "<<m_Geometry->GetFileName()<<endl;
-  if (m_Clusterizer != 0) {
+  if (m_Clusterizer != nullptr) {
     out<<"# "<<endl;
     out<<m_Clusterizer->ToString();
   }
-  if (m_Tracker != 0) {
+  if (m_Tracker != nullptr) {
     out<<"# "<<endl;
     out<<m_Tracker->ToString();
   }
-  if (m_CSR != 0) {
+  if (m_CSR != nullptr) {
     out<<"# "<<endl;
     out<<m_CSR->ToString();
   }
-  if (m_Decay != 0) {
+  if (m_Decay != nullptr) {
     out<<"# "<<endl;
     out<<m_Decay->ToString();
   }
@@ -934,7 +937,7 @@ bool MRawEventAnalyzer::PostAnalysis()
 
   out<<endl;
   out<<"----------------------------------------------------------------------------"<<endl;
-  if (m_Reader != 0) {
+  if (m_Reader != nullptr) {
     out<<endl;
     out<<m_Reader->GetERNoising()->ToString();
     out<<endl;
@@ -993,7 +996,7 @@ bool MRawEventAnalyzer::PostAnalysis()
   out<<endl;
 
 
-  if (m_PhysFile != 0) {
+  if (m_PhysFile != nullptr) {
     m_PhysFile->CloseEventList();
     m_PhysFile->AddFooter(out.str().c_str());
     m_PhysFile->Close();
@@ -1011,16 +1014,16 @@ bool MRawEventAnalyzer::PostAnalysis()
   mout<<endl;
   */
 
-  if (m_Clusterizer != 0) {
+  if (m_Clusterizer != nullptr) {
     m_Clusterizer->PostAnalysis();
   }
-  if (m_Tracker != 0) {
+  if (m_Tracker != nullptr) {
     m_Tracker->PostAnalysis();
   }
-  if (m_CSR != 0) {
+  if (m_CSR != nullptr) {
     m_CSR->PostAnalysis();
   }
-  if (m_Decay != 0) {
+  if (m_Decay != nullptr) {
     m_Decay->PostAnalysis();
   }
 
@@ -1050,22 +1053,22 @@ bool MRawEventAnalyzer::PreAnalysis()
       } else {
         mout<<"MRawEventAnalyzer: Loading of geometry "<<m_OriginObjectsFileName<<" failed!!"<<endl;
         delete m_OriginGeometry;
-        m_OriginGeometry = 0;
+        m_OriginGeometry = nullptr;
         Return = false;
       }
     } else {
       mout<<"MRawEventAnalyzer: Loading of geometry "<<m_OriginObjectsFileName<<" failed!!"<<endl;
       delete m_OriginGeometry;
-      m_OriginGeometry = 0;
+      m_OriginGeometry = nullptr;
       Return = false;
     }
   }
 
 
   if (m_Filename != "") {
-    if (m_Reader != 0 && m_Reader->IsOpen() == true) {
+    if (m_Reader != nullptr && m_Reader->IsOpen() == true) {
       m_Reader->ShowProgress(!m_IsBatch);
-      if (m_PhysFile != 0) {
+      if (m_PhysFile != nullptr) {
         if (m_PhysFile->IsOpen() == true) {
           Return = true;
         } else {
@@ -1080,23 +1083,33 @@ bool MRawEventAnalyzer::PreAnalysis()
   }
 
   if (Return == true) {
-    if (m_Geometry == 0) {
+    if (m_Geometry == nullptr) {
       cout<<"MRawEventAnalyzer: A geometry is required!"<<endl;
       Return = false;
     }
   }
 
+
+
+  // Coincidence
   if (Return == true) {
     delete m_Coincidence;
     m_Coincidence = new MERCoincidence();
     if (m_CoincidenceAlgorithm == c_CoincidenceAlgoWindow) {
       m_Coincidence->SetCoincidenceWindow(m_CoincidenceWindow);
+    } else if (m_CoincidenceAlgorithm == c_CoincidenceAlgoNone) {
+      // Nothing
+    } else {
+      merr<<"Unknown coincidence algorithm: "<<m_CoincidenceAlgorithm<<endl;
+      Return = false;
     }
   }
 
+
+  // Clusterining
   if (Return == true) {
     delete m_Clusterizer;
-    m_Clusterizer = 0;
+    m_Clusterizer = nullptr;
     if (m_ClusteringAlgorithm == c_ClusteringAlgoDistance) {
       m_Clusterizer = new MERClusterize();
       if (m_Clusterizer->SetParameters(m_StandardClusterizerMinDistanceD1,
@@ -1115,15 +1128,21 @@ bool MRawEventAnalyzer::PreAnalysis()
       if (m_Clusterizer->SetParameters(m_PDFClusterizerBaseFileName) == false) {
         Return = false;
       }
-    } else {
+    } else if (m_ClusteringAlgorithm == c_ClusteringAlgoAdjacent) {
       m_Clusterizer = new MERClusterize();
       if (m_Clusterizer->SetParameters(m_AdjacentLevel, m_AdjacentSigma) == false) {
         Return = false;
       }
+    } else if (m_ClusteringAlgorithm == c_ClusteringAlgoNone) {
+      // Nothing
+    } else {
+      merr<<"Unknown clustering algorithm: "<<m_ClusteringAlgorithm<<endl;
+      Return = false;
     }
 
+    // Compton sequence reconstruction
     delete m_CSR;
-    m_CSR = 0;
+    m_CSR = nullptr;
     if (m_CSRAlgorithm == c_CSRAlgoFoM) {
       m_CSR = new MERCSRChiSquare();
       if (dynamic_cast<MERCSRChiSquare*>(m_CSR)->SetParameters(m_Geometry,
@@ -1179,9 +1198,10 @@ bool MRawEventAnalyzer::PreAnalysis()
                                       m_CSROnlyCreateSequences) == false) {
         Return = false;
       }
-    } else if (m_CSRAlgorithm == c_CSRAlgoNeuralNetwork) {
-      m_CSR = new MERCSRNeuralNetwork();
-      if (dynamic_cast<MERCSRNeuralNetwork*>(m_CSR)->SetParameters(m_NeuralNetworkFileName,
+    } else if (m_CSRAlgorithm == c_CSRAlgoTMVA) {
+      m_CSR = new MERCSRTMVA();
+      if (dynamic_cast<MERCSRTMVA*>(m_CSR)->SetParameters(m_TMVAFileName,
+        m_TMVAMethods,
         m_Geometry,
         m_CSRThresholdMin,
         m_CSRThresholdMax,
@@ -1190,15 +1210,16 @@ bool MRawEventAnalyzer::PreAnalysis()
         m_CSROnlyCreateSequences) == false) {
         Return = false;
       }
-    } else if (m_CSRAlgorithm != c_CSRAlgoNone) {
+    } else if (m_CSRAlgorithm == c_CSRAlgoNone) {
+      // Nothing
+    } else {
+      merr<<"Unknown compton sequence reocnstruction algorithm: "<<m_CSRAlgorithm<<endl;
       Return = false;
     }
 
-
-    // Initialize the tracker:
-
+    // Electron tracking
     delete m_Tracker;
-    m_Tracker = 0;
+    m_Tracker = nullptr;
     if (m_TrackingAlgorithm == c_TrackingAlgoModifiedPearson) {
       m_Tracker = new MERTrack();
     } else if (m_TrackingAlgorithm == c_TrackingAlgoPearson) {
@@ -1217,10 +1238,14 @@ bool MRawEventAnalyzer::PreAnalysis()
           SetSpecialParameters(m_BETFileName) == false) {
         Return = false;
       }
-    } else if (m_TrackingAlgorithm != c_TrackingAlgoNone) {
+    } else if (m_TrackingAlgorithm == c_TrackingAlgoNone) {
+      // Nothing
+    } else {
+      merr<<"Unknown electron tracking algorithm: "<<m_TrackingAlgorithm<<endl;
       Return = false;
     }
 
+    // Pair Algorithm
     if (m_PairAlgorithm == c_PairKalman3D) {
       m_Tracker = new MERTrackKalman3D();
       dynamic_cast<MERTrackKalman3D*>(m_Tracker)->SetSpecialParameters(m_HeightX0, m_SigmaHitPos, m_NLayersForVertexSearch);
@@ -1233,7 +1258,7 @@ bool MRawEventAnalyzer::PreAnalysis()
       Return = false;
     }
 
-    if (m_Tracker != 0) {
+    if (m_Tracker != nullptr) {
       m_Tracker->SetGeometry(m_Geometry);
       m_Tracker->SetParameters(m_SearchMIPTracks,
                                m_SearchPairTracks,
@@ -1245,16 +1270,19 @@ bool MRawEventAnalyzer::PreAnalysis()
                                m_ElectronTrackingDetectorList);
     }
 
-    // Initialize the Decay searcher:
 
+    // Initialize the Decay searcher:
     delete m_Decay;
-    m_Decay = 0;
+    m_Decay = nullptr;
     if (m_DecayAlgorithm == c_DecayAlgoStandard) {
       m_Decay = new MERDecay();
       if (m_Decay->SetParameters(m_DecayFileName, m_DecayEnergy, m_DecayEnergyError) == false) {
         Return = false;
       }
-    } else if (m_DecayAlgorithm != c_DecayAlgoNone) {
+    } else if (m_DecayAlgorithm == c_DecayAlgoNone) {
+      // Nothing
+    } else {
+      merr<<"Unknown decay detection algorithm: "<<m_DecayAlgorithm<<endl;
       Return = false;
     }
   }
@@ -1262,7 +1290,7 @@ bool MRawEventAnalyzer::PreAnalysis()
   if (Return == false) {
     mout<<"MRawEventAnalyzer: Pre-analysis failed!"<<endl;
   } else {
-    if (m_PhysFile != 0) {
+    if (m_PhysFile != nullptr) {
       m_PhysFile->SetVersion(1);
       m_PhysFile->SetGeometryFileName(m_Geometry->GetFileName());
       m_PhysFile->WriteHeader();

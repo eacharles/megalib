@@ -40,6 +40,7 @@ using namespace std;
 #include "MStreams.h"
 #include "MResponseClusteringDSS.h"
 #include "MResponseMultipleCompton.h"
+#include "MResponseMultipleComptonEventFile.h"
 #include "MResponseMultipleComptonLens.h"
 #include "MResponseMultipleComptonTMVA.h"
 #include "MResponseMultipleComptonNeuralNet.h"
@@ -91,10 +92,14 @@ MResponseCreator::MResponseCreator()
   m_MaxNEvents = numeric_limits<int>::max();
 
   m_NoAbsorptions = false;
+  m_TMVAMethodsString = "BDTD";
+  m_MaxNInteractions = 7;
 
   m_SaveAfter = 100000;
 
   m_Compress = false;
+  
+  m_Interrupt = false;
 }
 
 
@@ -117,39 +122,55 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
   Usage<<"  Usage: responsecreator <options>"<<endl;
   Usage<<"    General options:"<<endl;
   Usage<<"      -g  --geometry        file  m  geometry file name"<<endl;
-  Usage<<"      -f  --filename        file  m  file name"<<endl;
+  Usage<<"      -f  --filename        file  m  file name (either sim/evta file, or training data)"<<endl;
   Usage<<"      -d  --debug                    enable debug"<<endl;
   Usage<<"      -r  --response-name   file     response file name"<<endl;
-  Usage<<"      -v  --verify                   verify"<<endl;
-  Usage<<"      -m  --mode            char  m  the modes are: "<<endl;
-  Usage<<"                                         s  : spectral (before reconstruction, mimrec without & with event selections)"<<endl;
-  Usage<<"                                         cd : clustering for double sided-strip detectors"<<endl;
-  Usage<<"                                         t  : track"<<endl;
-  Usage<<"                                         cb : compton (Bayesian)"<<endl;
-  Usage<<"                                         ct : compton (TMVA)"<<endl;
-  Usage<<"                                         cn : compton (NeuralNetwork)"<<endl;
-  Usage<<"                                         cl : compton (Laue lens or collimated)"<<endl;
-  Usage<<"                                         a  : ARM"<<endl;
-  Usage<<"                                         il : list-mode imaging"<<endl;
-  Usage<<"                                         ib : binned-mode imaging"<<endl;
-  Usage<<"                                         ic : coded mask imaging"<<endl;
-  Usage<<"                                         ef : efficiency far field (e.g. astrophysics)"<<endl;
-  Usage<<"                                         en : efficiency near field (e.g. medical)"<<endl;
-  Usage<<"                                         e  : earth horizon"<<endl;
-  Usage<<"                                         f  : first interaction position"<<endl;
-  Usage<<"                                         q  : event quality"<<endl;
+  Usage<<"      -m  --mode            text  m  The modes and their options are listed below"<<endl;
+  Usage<<"      -o  --options         text     The options for the specific response mode"<<endl;
+  Usage<<"                                     Option tag and value are separated by a \"=\""<<endl;
+  Usage<<"                                     Multiple options are separated by a \":\""<<endl;
+  Usage<<"                                     Example: emin=100:emax=20000:ebins=500"<<endl;
   Usage<<endl;
   Usage<<"      -i  --max-id          int      do the analysis up to id"<<endl;
   Usage<<"      -c  --revan-config    file     use this revan configuration file instead of defaults"<<endl;
   Usage<<"      -b  --mimrec-config   file     use this mimrec configuration file instead of defaults for the imaging response"<<endl;
   Usage<<"      -s  --save            int      save after this amount of entries"<<endl;
-  Usage<<"          --no-absorptions           don't calculate absoption probabilities"<<endl;
   Usage<<"      -z                             gzip the generated files"<<endl;
-  Usage<<"          --verbosity                Verbosity level"<<endl;
+  Usage<<"          --verbosity       int      Verbosity level"<<endl;
   Usage<<"      -h  --help                     print this help"<<endl;
   Usage<<endl;
-
-  string Option, SubOption;
+  Usage<<endl;
+  Usage<<"    Response modes and their options:"<<endl;
+  Usage<<endl;  
+  Usage<<"      s  : "<<MResponseSpectral::Description()<<endl;
+  Usage<<MResponseSpectral::Options()<<endl;
+  Usage<<"      cd : clustering for double sided-strip detectors"<<endl;
+  Usage<<"      t  : track"<<endl;
+  Usage<<"      cf : root good/bad event files for TMVA methods"<<endl;
+  Usage<<"      cb : compton (Bayesian)"<<endl;
+  Usage<<"      ct : compton (TMVA)"<<endl;
+  Usage<<"      cn : compton (NeuralNetwork)"<<endl;
+  Usage<<"      cl : compton (Laue lens or collimated)"<<endl;
+  Usage<<"      a  : ARM"<<endl;
+  Usage<<"      ib : "<<MResponseImagingBinnedMode::Description()<<endl;
+  Usage<<MResponseImagingBinnedMode::Options()<<endl;
+  Usage<<"      il : list-mode imaging"<<endl;
+  Usage<<"      ic : coded mask imaging"<<endl;
+  Usage<<"      ef : efficiency far field (e.g. astrophysics)"<<endl;
+  Usage<<"      en : efficiency near field (e.g. medical)"<<endl;
+  Usage<<"      e  : earth horizon"<<endl;
+  Usage<<"      f  : first interaction position"<<endl;
+  Usage<<"      q  : event quality"<<endl;
+  Usage<<endl;  
+  Usage<<"    Special options:"<<endl;
+  Usage<<"      For Compton modes (cf, cb, ct, cn, cl): "<<endl;
+  Usage<<"          --no-absorptions           don't calculate absoption probabilities - excludes all data sets with use absorption probabilities"<<endl;
+  Usage<<"          --max-interactions         maximum number of interactions to look at (don't go beyond 6-7)"<<endl;
+  Usage<<"      For TMVA Compton mode (ct): "<<endl;
+  Usage<<"          --tmva-methods             comma-separated list (no spaces) of TMVA methods to use: BDTD (*), MLP (*), DNN_GPU, DNN_CPU"<<endl;
+  Usage<<endl;
+  
+  string Option, SubOption, ResponseOptions;
 
   // Check for help
   for (int i = 1; i < argc; i++) {
@@ -227,7 +248,10 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
         cout<<"Choosing Compton mode (Neural Network)"<<endl;
       } else if (SubOption == "ct") {
         m_Mode = c_ModeComptonsTMVA;
-        cout<<"Choosing Compton mode (Neural Network)"<<endl;
+        cout<<"Choosing Compton mode (TMVA)"<<endl;
+      } else if (SubOption == "cf") {
+        m_Mode = c_ModeComptonsEventFile;
+        cout<<"Choosing Compton mode (Create events file)"<<endl;
       } else if (SubOption == "cl") {
         m_Mode = c_ModeComptonsLens;
         cout<<"Choosing Compton mode (lens/collimated)"<<endl;
@@ -266,6 +290,8 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
         cout<<Usage.str()<<endl;
         return false;
       }
+    } else if (Option == "-o" || Option == "--options") {
+      ResponseOptions = argv[++i];
     } else if (Option == "-z") {
       m_Compress = true;
       cout<<"Choosing compression (gzip) mode"<<endl;
@@ -275,6 +301,13 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     } else if (Option == "--no-absorptions") {
       m_NoAbsorptions = true;
       cout<<"Calculating no absorptions"<<endl;
+    } else if (Option == "--max-interactions") {
+      m_MaxNInteractions = atoi(argv[++i]);
+      if (m_MaxNInteractions < 2) m_MaxNInteractions = 2;
+      cout<<"Maximum number of interactions: "<<m_MaxNInteractions<<endl;
+    } else if (Option == "--tmva-methods") {
+      m_TMVAMethodsString = argv[++i];
+      cout<<"TMVA methods to use "<<m_TMVAMethodsString<<endl;
     } else if (Option == "-d") {
       if (g_Verbosity < 2) g_Verbosity = c_Chatty;
       cout<<"Enabling debug!"<<endl;
@@ -283,6 +316,8 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
       g_Verbosity = atoi(argv[++i]);
       if (g_Verbosity < 0) g_Verbosity = c_Quiet;
       cout<<"Setting verbosity to "<<g_Verbosity<<endl;
+    } else if (Option == "-l" || Option == "--log" ) {
+      // Ignored - only used by mresponsecreator
     } else {
       cout<<"Error: Unknown option \""<<Option<<"\"!"<<endl;
       cout<<Usage.str()<<endl;
@@ -326,7 +361,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
 
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeComptons) {
@@ -344,6 +379,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetResponseName(m_ResponseName);
     Response.SetCompression(m_Compress);
 
+    Response.SetMaxNInteractions(m_MaxNInteractions);
     Response.SetMaxNumberOfEvents(m_MaxNEvents);
     Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
 
@@ -351,10 +387,10 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetDoAbsorptions(!m_NoAbsorptions);
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
     
-  } else if (m_Mode == c_ModeComptonsTMVA) {
+  } else if (m_Mode == c_ModeComptonsEventFile) {
     
     if (m_RevanCfgFileName == g_StringNotDefined) {
       cout<<"Error: No revan configuration file name given!"<<endl;
@@ -362,13 +398,14 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
       return false;
     }
     
-    MResponseMultipleComptonTMVA Response;
+    MResponseMultipleComptonEventFile Response;
     
     Response.SetDataFileName(m_FileName);
     Response.SetGeometryFileName(m_GeometryFileName);
     Response.SetResponseName(m_ResponseName);
     Response.SetCompression(m_Compress);
     
+    Response.SetMaxNInteractions(m_MaxNInteractions);
     Response.SetMaxNumberOfEvents(m_MaxNEvents);
     Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
     
@@ -376,7 +413,29 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetDoAbsorptions(!m_NoAbsorptions);
     
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
+    if (Response.Finalize() == false) return false;
+    
+  } else if (m_Mode == c_ModeComptonsTMVA) {
+    
+    MResponseMultipleComptonTMVA Response;
+    
+    Response.SetDataFileName(m_FileName);
+    //Response.SetGeometryFileName(m_GeometryFileName);
+    Response.SetResponseName(m_ResponseName);
+    //Response.SetCompression(m_Compress);
+    
+    Response.SetMethods(m_TMVAMethodsString);
+    
+    Response.SetMaxNInteractions(m_MaxNInteractions);
+    Response.SetMaxNumberOfEvents(m_MaxNEvents);
+    //Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
+    
+    //Response.SetRevanSettingsFileName(m_RevanCfgFileName);
+    //Response.SetDoAbsorptions(!m_NoAbsorptions);
+    
+    if (Response.Initialize() == false) return false;
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
     
   } else if (m_Mode == c_ModeComptonsNeuralNetwork) {
@@ -394,6 +453,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetResponseName(m_ResponseName);
     Response.SetCompression(m_Compress);
     
+    Response.SetMaxNInteractions(m_MaxNInteractions);
     Response.SetMaxNumberOfEvents(m_MaxNEvents);
     Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
     
@@ -401,7 +461,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetDoAbsorptions(!m_NoAbsorptions);
     
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
     
   } else if (m_Mode == c_ModeComptonsLens) {
@@ -419,6 +479,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetResponseName(m_ResponseName);
     Response.SetCompression(m_Compress);
     // Response.SetStartEventID(0);
+    Response.SetMaxNInteractions(m_MaxNInteractions);
     Response.SetMaxNumberOfEvents(m_MaxNEvents);
     Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
 
@@ -426,7 +487,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetDoAbsorptions(!m_NoAbsorptions);
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
 
@@ -451,7 +512,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanSettingsFileName(m_RevanCfgFileName);
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeSpectral) {
@@ -468,8 +529,9 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanSettingsFileName(m_RevanCfgFileName);
     Response.SetMimrecSettingsFileName(m_MimrecCfgFileName);
 
+    if (Response.ParseOptions(ResponseOptions) == false) return false;
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeARM) {
@@ -494,7 +556,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanSettingsFileName(m_RevanCfgFileName);
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeEfficiency) {
@@ -519,7 +581,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
 
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeEfficiencyNearField) {
@@ -544,7 +606,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
 
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
 } else if (m_Mode == c_ModeEventQuality) {
@@ -568,7 +630,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanSettingsFileName(m_RevanCfgFileName);
 
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeImagingListMode) {
@@ -642,8 +704,9 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanSettingsFileName(m_RevanCfgFileName);
     Response.SetMimrecSettingsFileName(m_MimrecCfgFileName);
 
+    if (Response.ParseOptions(ResponseOptions) == false) return false;
     if (Response.Initialize() == false) return false;
-    while (Response.Analyze() == true);
+    while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
   } else if (m_Mode == c_ModeImagingCodedMask) {

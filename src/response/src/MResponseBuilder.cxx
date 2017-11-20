@@ -79,10 +79,10 @@ MResponseBuilder::MResponseBuilder()
   m_RevanEventID = 0;
   m_RevanLevel = 0;
   m_SivanEventID = 0;
-  m_SivanLevel =0;
+  m_SivanLevel = 0;
  
-  m_SiGeometry = 0;
-  m_ReGeometry = 0;
+  m_SiGeometry = nullptr;
+  m_ReGeometry = nullptr;
 
   m_NumberOfSimulatedEventsClosedFiles = 0;
   m_NumberOfSimulatedEventsThisFile = 0;
@@ -463,7 +463,7 @@ bool MResponseBuilder::InitializeNextMatchingEvent()
       m_SiEvent = m_SiReader->GetNextEvent(false);
 
       // Decide:
-      if (m_SiEvent != 0) {
+      if (m_SiEvent != 0) {  
         // Test if it is not truncated:
         if ((m_OnlyINITRequired == true && m_SiEvent->GetNIAs() == 1 && m_SiEvent->GetIAAt(0)->GetProcess() == "INIT") || 
             (m_SiEvent->GetNIAs() > 1 && m_SiEvent->GetIAAt(m_SiEvent->GetNIAs()-1)->GetProcess() != "TRNC")) {
@@ -476,7 +476,7 @@ bool MResponseBuilder::InitializeNextMatchingEvent()
           //mout<<"Response: Sivan found good event (Id="<<m_SiEvent->GetID()<<")!"<<endl;
         } else {
           // Ignore this event...
-          //mout<<"Response: Sivan found NO good event (Id="<<m_SiEvent->GetID()<<") TRNC or not enough IAs!"<<endl;
+          mout<<"Response: Sivan found NO good event (Id="<<m_SiEvent->GetID()<<") TRNC or not enough IAs!"<<endl;
           TryNextEvent = true;
         }
       } else {

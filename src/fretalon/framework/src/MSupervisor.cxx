@@ -33,6 +33,7 @@ using namespace std;
 
 // ROOT libs:
 #include "TSystem.h"
+#include "TGClient.h"
 #include "TApplication.h"
 
 // MEGAlib libs:
@@ -704,6 +705,12 @@ void MSupervisor::SetHardInterrupt(bool Flag)
 
 bool MSupervisor::LaunchUI()
 {
+  // No GUI
+  if (gClient == nullptr || gClient->GetRoot() == nullptr) {
+    mout<<"Error: Trying to use a user interface but no windows can be initialized. Are you on a remote connection without X forwarding?"<<endl;
+    m_UIUse = false;
+    return false;
+  }
   m_Gui = new MGUIMainFretalon(this);
   m_Gui->SetProgramName(m_UIProgramName);
   m_Gui->SetPicturePath(m_UIPicturePath);
@@ -783,6 +790,7 @@ bool MSupervisor::Analyze()
     ++NExpos;
 
     for (unsigned int m = 0; m < GetNModules(); ++m) {
+      GetModule(m)->CreateExpos();
       if (GetModule(m)->HasExpos() == true) {
         m_ExpoCombinedViewer->AddExpos(GetModule(m)->GetExpos());
         ++NExpos;

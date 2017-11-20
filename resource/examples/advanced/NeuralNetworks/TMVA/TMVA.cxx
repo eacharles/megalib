@@ -43,7 +43,7 @@ using namespace std;
 
 // MEGAlib
 #include "MGlobal.h"
-
+#include "MTime.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +69,8 @@ private:
   bool m_Interrupt;
   //! The file name
   MString m_FileName;
+  //! The use methods
+  map<MString, int> m_Methods;
 };
 
 
@@ -103,6 +105,7 @@ bool TMVAAnalyzer::ParseCommandLine(int argc, char** argv)
   Usage<<"  Usage: TMVAAnalyzer <options>"<<endl;
   Usage<<"    General options:"<<endl;
   Usage<<"         -f:   file name (e.g. Tree.tmva.seq2.good.root - bad is loaded automatically)"<<endl;
+  Usage<<"         -m:   methods: MLP, BDTD, PDEFoamBoost, DNN_GPU, DNN_CPU, PDERSPCA"<<endl;
   Usage<<"         -h:   print this help"<<endl;
   Usage<<endl;
 
@@ -148,6 +151,9 @@ bool TMVAAnalyzer::ParseCommandLine(int argc, char** argv)
     if (Option == "-f") {
       m_FileName = argv[++i];
       cout<<"Accepting file name: "<<m_FileName<<endl;
+    } else if (Option == "-m") {
+      m_Methods[argv[++i]] = 1;
+      cout<<"Accepting method: "<<argv[i]<<endl;
     } else {
       cout<<"Error: Unknown option \""<<Option<<"\"!"<<endl;
       cout<<Usage.str()<<endl;
@@ -167,7 +173,10 @@ bool TMVAAnalyzer::Analyze()
 {
   if (m_Interrupt == true) return false;
 
-  MString ResultsFileName = "Results.root";
+  MTime Now;
+  MString TimeString = Now.GetShortString();
+  
+  MString ResultsFileName = MString("Results.") + TimeString + ".root";
   TFile* Results = new TFile(ResultsFileName, "recreate");
   
   TFile* SourceFile = new TFile(m_FileName); 
@@ -187,14 +196,19 @@ bool TMVAAnalyzer::Analyze()
       
   TMVA::Factory *factory = new TMVA::Factory("TMVAClassification", Results,
                                             "!V:!Silent:Color:DrawProgressBar:Transformations=I;D;P;G,D:AnalysisType=Classification" );
-      
-  TMVA::DataLoader *dataloader=new TMVA::DataLoader("dataset");
-      
+
+  MString OutDir("Results.");
+  OutDir += TimeString;
+  TMVA::DataLoader *dataloader=new TMVA::DataLoader(OutDir.Data());
+
+  
+  vector<TString> IgnoredBranches = { "SimulationIDs" }; //, "AbsorptionProbabilityToFirstIAAverage", "AbsorptionProbabilityToFirstIAMaximum",  "AbsorptionProbabilityToFirstIAMinimum", "ZenithAngle", "NadirAngle" };
+  
   TObjArray* Branches = SourceTree->GetListOfBranches();
   for (int b = 0; b < Branches->GetEntries(); ++b) {
     TBranch* B = dynamic_cast<TBranch*>(Branches->At(b));
     TString Name = B->GetName();
-    if (Name != "SimulationIDs") {
+    if (find(IgnoredBranches.begin(), IgnoredBranches.end(), Name) == IgnoredBranches.end()) {
       dataloader->AddVariable(Name, 'D');
     }
   }
@@ -204,14 +218,51 @@ bool TMVAAnalyzer::Analyze()
   
   dataloader->PrepareTrainingAndTestTree("", "SplitMode=Random:V");
 
-  // Standard MLP  
-  factory->BookMethod( dataloader, TMVA::Types::kMLP, "MLP", "H:!V:NeuronType=tanh:VarTransform=N:NCycles=600:HiddenLayers=N+5:TestRate=5:!UseRegulator" );
-  
-  // Boosted decision tree: Decorrelation + Adaptive Boost
-  factory->BookMethod( dataloader, TMVA::Types::kBDT, "BDTD",
-                       "!H:!V:NTrees=400:MinNodeSize=5%:MaxDepth=3:BoostType=AdaBoost:SeparationType=GiniIndex:nCuts=20:VarTransform=Decorrelate" );
-  
+  // Standard MLP
+  if (m_Methods["MLP"] == 1) {
+    factory->BookMethod( dataloader, TMVA::Types::kMLP, "MLP", "H:!V:NeuronType=tanh:VarTransform=N:NCycles=100:HiddenLayers=N+5:TestRate=5:!UseRegulator" );
+  }
     
+  // Boosted decision tree: Decorrelation + Adaptive Boost
+  if (m_Methods["BDTD"] == 1) {
+    factory->BookMethod( dataloader, TMVA::Types::kBDT, "BDTD", "!H:!V:NTrees=400:MinNodeSize=5%:MaxDepth=3:BoostType=AdaBoost:SeparationType=GiniIndex:nCuts=20:VarTransform=Decorrelate" );
+  }
+  
+  if (m_Methods["PDEFoamBoost"] == 1) {
+    factory->BookMethod( dataloader, TMVA::Types::kPDEFoam, "PDEFoamBoost","!H:!V:Boost_Num=30:Boost_Transform=linear:SigBgSeparate=F:MaxDepth=4:UseYesNoCell=T:DTLogic=MisClassificationError:FillFoamWithOrigWeights=F:TailCut=0:nActiveCells=500:nBin=20:Nmin=400:Kernel=None:Compress=T" );
+  }
+  
+  if (m_Methods["PDERSPCA"] == 1) {
+    factory->BookMethod( dataloader, TMVA::Types::kPDERS, "PDERSPCA", "!H:!V:VolumeRangeMode=Adaptive:KernelEstimator=Gauss:GaussSigma=0.3:NEventsMin=400:NEventsMax=600:VarTransform=PCA" );
+  }
+  
+  
+  // General layout.
+  TString layoutString ("Layout=TANH|128,TANH|128,TANH|128,LINEAR");
+  
+  // Training strategies.
+  TString training0("LearningRate=1e-1,Momentum=0.9,Repetitions=1,ConvergenceSteps=20,BatchSize=256,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.5+0.5+0.5, Multithreading=True");
+  TString training1("LearningRate=1e-2,Momentum=0.9,Repetitions=1,ConvergenceSteps=20,BatchSize=256,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.0+0.0+0.0, Multithreading=True");
+  TString training2("LearningRate=1e-3,Momentum=0.0,Repetitions=1,ConvergenceSteps=20,BatchSize=256,TestRepetitions=10,WeightDecay=1e-4,Regularization=L2,DropConfig=0.0+0.0+0.0+0.0, Multithreading=True");
+  TString trainingStrategyString ("TrainingStrategy=");
+  trainingStrategyString += training0 + "|" + training1 + "|" + training2;
+  
+  // General Options.
+  TString dnnOptions ("!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM");
+  dnnOptions.Append (":"); dnnOptions.Append (layoutString);
+  dnnOptions.Append (":"); dnnOptions.Append (trainingStrategyString);
+  
+  // Cuda implementation.
+  if (m_Methods["DNN_GPU"] == 1) {
+    TString gpuOptions = dnnOptions + ":Architecture=GPU";
+    factory->BookMethod(dataloader, TMVA::Types::kDNN, "DNN_GPU", gpuOptions);
+  }
+  
+  // Multi-core CPU implementation.
+  if (m_Methods["DNN_CPU"] == 1) {
+    TString cpuOptions = dnnOptions + ":Architecture=CPU";
+    factory->BookMethod(dataloader, TMVA::Types::kDNN, "DNN_CPU", cpuOptions);
+  }
     
   
   factory->TrainAllMethods();
@@ -222,6 +273,7 @@ bool TMVAAnalyzer::Analyze()
   
   delete factory;
   delete dataloader;
+  
   // Launch the GUI for the root macros
   //if (!gROOT->IsBatch()) TMVA::TMVAGui(ResultsFileName);
   

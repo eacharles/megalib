@@ -639,7 +639,7 @@ void MInterfaceMimrec::Reconstruct(bool Animate)
       mgui<<"Unable to set all deconvolution settings"<<error;
       return;
     }
-    
+
     // Analyze... do the reconstruction
     m_Imager->Analyze(!JustDeconvolve);
 
@@ -1253,7 +1253,7 @@ void MInterfaceMimrec::ARMGamma()
       if (TVirtualFitter::GetFitter() != nullptr) {
         (TVirtualFitter::GetFitter())->GetConfidenceIntervals(Confidence, ConfidenceLevel);
       } else {
-        merr<<"Virtual fitter is nullptr -- confidence intervals are wrong!"<<endl; 
+        merr<<"Virtual fitter is nullptr -- confidence intervals are wrong!"<<endl;
       }
       Hist->SetTitle(MString("ARM (Compton cone) with ") + ConfidenceLevelString + MString(" confidence intervals"));
     }
@@ -1805,12 +1805,6 @@ void MInterfaceMimrec::AngularResolutionPairs()
   }
 
   TCanvas* Canvas2 = new TCanvas("CanvasAngularResolutionPairsVsOpeningAngle", "Canvas angular resolution pairs vs. opening angle", 800, 600);
-  Canvas2->SetFillColor(0);
-  Canvas2->SetFrameBorderSize(0);
-  Canvas2->SetFrameBorderMode(0);
-  Canvas2->SetBorderSize(0);
-  Canvas2->SetBorderMode(0);
-
   Canvas2->cd();
   Hist2->Draw("colz");
   Canvas2->Update();
@@ -1821,8 +1815,7 @@ void MInterfaceMimrec::AngularResolutionPairs()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-
-void MInterfaceMimrec::ARMGammaVsCompton()
+void MInterfaceMimrec::ARMGammaVsComptonScatterAngle()
 {
   // Display the angular resolution measurement for the gamma-ray as function of
   // the Compton scatter angle
@@ -1842,13 +1835,14 @@ void MInterfaceMimrec::ARMGammaVsCompton()
   //BinWidth = 2*Disk/NBins;
   int NBinsArm = NBins;
   int NBinsAngle = NBins;
-  TH2D* Hist = new TH2D("ARM vs. Compton Angle", "ARM vs. Compton Angle (normalized)",
+
+  TH2D* Hist = new TH2D("ARMvsComptonScatterAngle", "ARM vs. Compton scatter angle",
                         NBinsArm, -Disk, Disk, NBinsAngle,
                         m_Settings->GetComptonAngleRangeMin(),
                         m_Settings->GetComptonAngleRangeMax());
   Hist->SetBit(kCanDelete);
-  Hist->SetXTitle("ARM [#circ]");
-  Hist->SetYTitle("Compton scatter angle [#circ]");
+  Hist->SetXTitle("ARM [deg]");
+  Hist->SetYTitle("Compton scatter angle [deg]");
 
 
   MPhysicalEvent* Event = nullptr;
@@ -1878,6 +1872,7 @@ void MInterfaceMimrec::ARMGammaVsCompton()
   }
 
   // Normalize:
+  /*
   for (int by = 1; by <= Hist->GetNbinsY(); ++by) {
     double Sum = 0;
     for (int bx = 1; bx <= Hist->GetNbinsX(); ++bx) {
@@ -1889,14 +1884,13 @@ void MInterfaceMimrec::ARMGammaVsCompton()
       }
     }
   }
+  */
 
-  TCanvas* ARMvsComptonCanvas =
-    new TCanvas("Canvas ARM vs Compton",
-                "Canvas ARM vs Compton", 800, 600);
-  ARMvsComptonCanvas->cd();
-  //Nicen(Hist, ARMvsComptonCanvas);
+  TCanvas* Canvas = new TCanvas();
+  Canvas->SetTitle("ARM vs. Compton scatter angle");
+  Canvas->cd();
   Hist->Draw("COLZ");
-  ARMvsComptonCanvas->Update();
+  Canvas->Update();
 
   return;
 }
@@ -2781,26 +2775,11 @@ void MInterfaceMimrec::ARMGammaVsComptonProbability()
   double Disk = m_Settings->GetTPDistanceTrans();
   MVector TestPosition = GetTestPosition();
 
-  // Initialize the image size (x-axis)
-  int x1NBins = NBins;
-  double* x1Bins = CreateAxisBins(-Disk, +Disk, x1NBins, false);
-
-  bool logx2 = true;
-  int x2NBins = NBins;
-  double* x2Bins = CreateAxisBins(m_Settings->GetComptonQualityFactorRangeMin(), m_Settings->GetComptonQualityFactorRangeMax(), x2NBins, logx2);
-
-
-
-  TH2D* Hist = new TH2D("ARM vs. Compton Quality Factor", "ARM vs. Compton Quality Factor",
-                        x1NBins, x1Bins, x2NBins, x2Bins);
-  Hist->SetBit(kCanDelete);
-  Hist->SetXTitle("ARM [#circ]");
-  Hist->SetYTitle("Compton quality factor");
-
-
   MPhysicalEvent* Event = nullptr;
   MComptonEvent* ComptonEvent = nullptr;
   // ... loop over all events and save a count in the belonging bin ...
+  vector<double> ARMValues;
+  vector<double> CQFs;
   while ((Event = GetNextEvent()) != 0) {
 
     // Only accept Comptons within the selected ranges...
@@ -2808,8 +2787,8 @@ void MInterfaceMimrec::ARMGammaVsComptonProbability()
       if (Event->GetType() == MPhysicalEvent::c_Compton) {
         ComptonEvent = dynamic_cast<MComptonEvent*>(Event);
 
-        Hist->Fill(ComptonEvent->GetARMGamma(TestPosition, m_Settings->GetCoordinateSystem())*c_Deg,
-                   ComptonEvent->ComptonQualityFactor1());
+        ARMValues.push_back(ComptonEvent->GetARMGamma(TestPosition, m_Settings->GetCoordinateSystem())*c_Deg);
+        CQFs.push_back(ComptonEvent->ComptonQualityFactor1());
       }
     }
 
@@ -2819,24 +2798,39 @@ void MInterfaceMimrec::ARMGammaVsComptonProbability()
   // Close the event loader
   FinalizeEventLoader();
 
-  if (Hist->GetMaximum() == 0) {
-    Error("ARMGamma()", "No events passed the event selections or file is empty!");
+  if (ARMValues.size() == 0) {
+    merr<<"No events passed the event selections or file is empty!"<<endl;
     return;
   }
 
+  // Initialize the image size (x-axis)
+  double CQFMax = *max_element(CQFs.begin(), CQFs.end());
+  double CQFMin = *min_element(CQFs.begin(), CQFs.end());
 
-  TCanvas* ARMvsComptonCanvas =
-    new TCanvas("Canvas ARM vs Compton Probability",
-                "Canvas ARM vs Compton Probability", 800, 600);
-  ARMvsComptonCanvas->cd();
-  if (logx2 == true) {
-    ARMvsComptonCanvas->SetLogy();
+  if (CQFMax > m_Settings->GetComptonQualityFactorRangeMax()) {
+    CQFMax = m_Settings->GetComptonQualityFactorRangeMax();
   }
+  if (CQFMin < m_Settings->GetComptonQualityFactorRangeMin()) {
+    CQFMin = m_Settings->GetComptonQualityFactorRangeMin();
+  }
+
+  TH2D* Hist = new TH2D("ARM vs. Compton Quality Factor", "ARM vs. Compton Quality Factor",
+                        NBins, -Disk, +Disk, NBins, CQFMin, CQFMax);
+  Hist->SetBit(kCanDelete);
+  Hist->SetXTitle("ARM [#circ]");
+  Hist->SetYTitle("Compton quality factor");
+
+  for (unsigned int i = 0; i < ARMValues.size(); ++i) {
+    Hist->Fill(ARMValues[i], CQFs[i]);
+  }
+    
+  TCanvas* ARMvsComptonCanvas =
+    new TCanvas("Canvas ARM vs Compton quality factor",
+                "Canvas ARM vs Compton quality factor", 800, 600);
+  ARMvsComptonCanvas->cd();
+
   Hist->Draw("COLZ");
   ARMvsComptonCanvas->Update();
-
-  delete [] x1Bins;
-  delete [] x2Bins;
 
   return;
 }
@@ -6204,8 +6198,8 @@ void MInterfaceMimrec::CreateCosimaOrientationFile()
 
   bool First = true;
   MTime LastTime(0);
-  MTime Gap(5.0); 
-  
+  MTime Gap(5.0);
+
   bool IsOn = false;
   MPhysicalEvent* Event = nullptr;
   while ((Event = GetNextEvent()) != 0) {
@@ -6232,7 +6226,7 @@ void MInterfaceMimrec::CreateCosimaOrientationFile()
             lout<<"DP "<<LastTime<<" off"<<endl;
             IsOn = false;
           }
-        } else {  
+        } else {
           if (Event->GetTime() - LastTime > Gap) {
             if (IsOn == true) {
               cout<<"Forward Jump: Off: "<<Event->GetTime()<<":"<<LastTime<<endl;

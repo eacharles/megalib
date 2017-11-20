@@ -1,5 +1,5 @@
 /* 
- * SimpleComptonImaging.cxx
+ * BinnedComptonImaging.cxx
  *
  *
  * Copyright (C) by Andreas Zoglauer.
@@ -52,17 +52,18 @@ using namespace std;
 #include "MResponseMatrixAxis.h"
 #include "MEventSelector.h"
 #include "MSettingsMimrec.h"
+#include "MImageGalactic.h"
 
 
 /******************************************************************************/
 
-class SimpleComptonImaging
+class BinnedComptonImaging
 {
 public:
   /// Default constructor
-  SimpleComptonImaging();
+  BinnedComptonImaging();
   /// Default destructor
-  ~SimpleComptonImaging();
+  ~BinnedComptonImaging();
   
   /// Parse the command line
   bool ParseCommandLine(int argc, char** argv);
@@ -79,18 +80,30 @@ public:
 protected:
   /// Parallel response rotation
   bool RotateResponseInParallel(unsigned int ThreadID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ);  
-  
+  ///Parallel background model rotation
+  bool RotateBackgroundModelInParallel(unsigned int ThreadID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ);
+
+  /// Create the background model
+  bool CreateBackgroundModel();
   
 private:
   /// True, if the analysis needs to be interrupted
   bool m_Interrupt;
 
+  //! Just create the background model
+  bool m_JustDoBackgroundModel;
+  //! Just create the galactic response file
+  bool m_JustDoGalacticResponse;
+  
+  
   /// Simulation file name
   MString m_FileName;
   /// Mimrec configuration file name
   MString m_MimrecCfgFileName;
   /// Response file name
   MString m_ResponseFileName;
+  /// Response file name
+  MString m_BackgroundModelFileName;
   /// Response file name
   MString m_ResponseGalacticFileName;
   /// The number of iterations the algorithm has to run
@@ -108,8 +121,13 @@ private:
   MResponseMatrixON m_Pointing;
   //! The stored response
   MResponseMatrixON m_Response;
-  //! The galactic response
+  //! The rotated response in Galactic coordinates
   MResponseMatrixON m_ResponseGalactic;
+  
+  //! The background model
+  MResponseMatrixON m_BackgroundModel;
+  //! The rotated background model in Galactic coordinates
+  MResponseMatrixON m_BackgroundModelGalactic;
 };
 
 /******************************************************************************/
@@ -118,10 +136,14 @@ private:
 /******************************************************************************
  * Default constructor
  */
-SimpleComptonImaging::SimpleComptonImaging() : m_Interrupt(false)
+BinnedComptonImaging::BinnedComptonImaging() : m_Interrupt(false)
 {
   m_Iterations = 5;
-  m_UseMaximumEntropy = true;
+  
+  m_JustDoBackgroundModel = false;
+  m_JustDoGalacticResponse = false;
+  
+  m_UseMaximumEntropy = false;
   gStyle->SetPalette(kBird);
 }
 
@@ -129,7 +151,7 @@ SimpleComptonImaging::SimpleComptonImaging() : m_Interrupt(false)
 /******************************************************************************
  * Default destructor
  */
-SimpleComptonImaging::~SimpleComptonImaging()
+BinnedComptonImaging::~BinnedComptonImaging()
 {
   // Intentionally left blanck
 }
@@ -138,17 +160,21 @@ SimpleComptonImaging::~SimpleComptonImaging()
 /******************************************************************************
  * Parse the command line
  */
-bool SimpleComptonImaging::ParseCommandLine(int argc, char** argv)
+bool BinnedComptonImaging::ParseCommandLine(int argc, char** argv)
 {
   ostringstream Usage;
   Usage<<endl;
-  Usage<<"  Usage: SimpleComptonImaging <options>"<<endl;
+  Usage<<"  Usage: BinnedComptonImaging <options>"<<endl;
   Usage<<"    General options:"<<endl;
   Usage<<"         -f:   tra file name"<<endl;
-  Usage<<"         -c:   Mimrec configuration file"<<endl;
+  Usage<<"         -c:   mimrec configuration file"<<endl;
   Usage<<"         -r:   response file"<<endl;
   Usage<<"         -g:   response galactic file"<<endl;
+  Usage<<"         -b:   background model"<<endl;
   Usage<<"         -i:   number of iterations (default: 5)"<<endl;
+  Usage<<"         -a:   algorithm: rl (default) or mem"<<endl;
+  Usage<<"         -cg:  create galactic response file"<<endl;
+  Usage<<"         -cb:  create background model"<<endl;
   Usage<<"         -h:   print this help"<<endl;
   Usage<<endl;
 
@@ -195,12 +221,34 @@ bool SimpleComptonImaging::ParseCommandLine(int argc, char** argv)
     } else if (Option == "-g") {
       m_ResponseGalacticFileName = argv[++i];
       cout<<"Accepting response galactic file name: "<<m_ResponseGalacticFileName<<endl;
+    } else if (Option == "-b") {
+      m_BackgroundModelFileName = argv[++i];
+      cout<<"Accepting background model file name: "<<m_BackgroundModelFileName<<endl;
     } else if (Option == "-c") {
       m_MimrecCfgFileName = argv[++i];
       cout<<"Accepting mimrec configuration file name: "<<m_MimrecCfgFileName<<endl;
     } else if (Option == "-i") {
       m_Iterations = atoi(argv[++i]);
       cout<<"Accepting iterations: "<<m_Iterations<<endl;
+    } else if (Option == "-a") {
+      MString Algo(argv[++i]);
+      Algo.ToLowerInPlace();
+      if (Algo == "rl") {
+        m_UseMaximumEntropy = false;
+        cout<<"Accepting Richardson Lucy"<<endl;
+      } else if (Algo == "mem") {
+        m_UseMaximumEntropy = true;
+        cout<<"Accepting Maximum-Entropy"<<endl;
+      } else {
+        cout<<"Error: Unknown algorithm: "<<Algo<<endl;
+        return false;
+      }
+    } else if (Option == "-cb") {
+      m_JustDoBackgroundModel = true;
+      cout<<"Doing background model"<<endl;
+    } else if (Option == "-cg") {
+      m_JustDoGalacticResponse = true;
+      cout<<"Doing galactic response"<<endl;
     } else {
       cout<<"Error: Unknown option \""<<Option<<"\"!"<<endl;
       cout<<Usage.str()<<endl;
@@ -226,6 +274,94 @@ bool SimpleComptonImaging::ParseCommandLine(int argc, char** argv)
     return false;
   }
   
+  //
+  if (m_JustDoBackgroundModel == true) {
+    CreateBackgroundModel(); 
+    return false;
+  }
+  
+  return true;
+}
+
+
+/******************************************************************************
+ * Create the background model
+ */
+bool BinnedComptonImaging::CreateBackgroundModel()
+{ 
+  // Open the response file - which determines the data space grid...
+  if (m_Response.Read(m_ResponseFileName) == false) {
+    mgui<<"Cannot read response file: \""<<m_ResponseFileName<<"\""<<endl;
+    return false;
+  }
+  
+  MResponseMatrixON Data("Data");
+  Data.AddAxis(m_Response.GetAxis(2)); // energy
+  Data.AddAxis(m_Response.GetAxis(3)); // phi
+  Data.AddAxis(m_Response.GetAxis(4)); // direction of scattered gamma ray
+  
+  
+  // Read configuration file
+  MSettingsMimrec MimrecCfg(false);
+  MimrecCfg.Read(m_MimrecCfgFileName);
+  MEventSelector EventSelector;
+  EventSelector.SetSettings(&MimrecCfg);  
+  
+  // Open the *.tra file
+  MFileEventsTra* EventFile = new MFileEventsTra();
+  if (EventFile->Open(m_FileName) == false) return false;
+  EventFile->ShowProgress();
+  
+  
+  // Backproject all events:
+  cout<<"Filling data space..."<<endl;
+  
+  float Ei;
+  float Phi;
+  MVector Dg;
+  float Chi;
+  float Psi;
+  
+  // Fill the data space
+  MPhysicalEvent* Event = 0;
+  MComptonEvent* ComptonEvent = 0;
+  
+  while ((Event = EventFile->GetNextEvent()) != 0) {
+    
+    if (EventSelector.IsQualifiedEventFast(Event) == false) {
+      delete Event;
+      continue;
+    }
+    
+    if (Event->GetType() == MPhysicalEvent::c_Compton) {
+      ComptonEvent = dynamic_cast<MComptonEvent*>(Event);
+      
+      Ei = ComptonEvent->Ei();
+      Phi = ComptonEvent->Phi()*c_Deg;
+      Dg = -ComptonEvent->Dg(); // Invert!
+      
+      
+      if (Phi < 0 || Phi > 60) continue;
+      
+      Chi = Dg.Phi()*c_Deg;
+      while (Chi < 0) Chi += 360.0;
+      while (Chi > 360) Chi -= 360.0;
+      Psi = Dg.Theta()*c_Deg;
+      
+      //cout<<Event->GetId()<<": "<<Phi<<":"<<Psi<<": "<<Chi<<endl;
+      
+      Data.Add(vector<double>{Ei, Phi, Psi, Chi}, 1);
+    } // if Compton
+    
+    delete Event;
+  }
+  
+  delete EventFile;
+  
+  gSystem->ProcessEvents();
+
+  Data.Write("BackgroundModel.rsp");
+  
   return true;
 }
 
@@ -233,7 +369,7 @@ bool SimpleComptonImaging::ParseCommandLine(int argc, char** argv)
 /******************************************************************************
  * Parallel response rotation
  */
-bool SimpleComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ)
+bool BinnedComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ)
 { 
   // Dimensions for later:
   unsigned int InitialEnergyBins = m_Response.GetAxis(0).GetNumberOfBins();
@@ -260,15 +396,15 @@ bool SimpleComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vecto
     MRotationInterface RI;
     RI.SetGalacticPointingXAxis(XPointing[1], XPointing[0]-90); // Convert to Galactic 
     RI.SetGalacticPointingZAxis(ZPointing[1], ZPointing[0]-90); // Convert to Galactic 
-    //MRotation R = RI.GetGalacticPointingInverseRotationMatrix(); //good
-    MRotation R = RI.GetGalacticPointingRotationMatrix(); // better
+    MRotation R = RI.GetGalacticPointingInverseRotationMatrix(); //good
+    //MRotation R = RI.GetGalacticPointingRotationMatrix(); // wromg, but too good to believe
     
     /*
-    MRotationInterface RI2;
-    RI2.SetGalacticPointingXAxis(128.791, 7.50619); // Convert to Galactic 
-    RI2.SetGalacticPointingZAxis(218.049, -5.61504); // Convert to Galactic 
-    MRotation R2 = RI2.GetGalacticPointingInverseRotationMatrix();
-    */
+     *    MRotationInterface RI2;
+     *    RI2.SetGalacticPointingXAxis(128.791, 7.50619); // Convert to Galactic 
+     *    RI2.SetGalacticPointingZAxis(218.049, -5.61504); // Convert to Galactic 
+     *    MRotation R2 = RI2.GetGalacticPointingInverseRotationMatrix();
+     */
     
     
     // Precalculate the rotation map
@@ -316,7 +452,7 @@ bool SimpleComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vecto
               
               unsigned int long A5 = A4 + M5*RotatedBinMapping[fd];
               unsigned int long B5 = B4 + M5*fd;
-
+              
               double ResponseData = m_Response.Get(A5)*PointingScaler; // Normalize by time in pointing  
               if (ResponseData == 0) continue;
               
@@ -337,16 +473,125 @@ bool SimpleComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vecto
 
 
 /******************************************************************************
+ * Parallel background model rotation
+ */
+bool BinnedComptonImaging::RotateBackgroundModelInParallel(unsigned int ThreadID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ)
+{ 
+  // Dimensions for later:
+  unsigned int FinalEnergyBins = m_BackgroundModel.GetAxis(0).GetNumberOfBins();
+  unsigned int FinalPhiBins = m_BackgroundModel.GetAxis(1).GetNumberOfBins();
+  unsigned int FinalDirectionBins = m_BackgroundModel.GetAxis(2).GetNumberOfBins();
+  
+  for (unsigned int b = 0; b < PointingBinsX.size(); ++b) {
+    
+    cout<<"Thread #"<<ThreadID<<": "<<b+1<<"/"<<PointingBinsX.size()<<endl;
+    
+    // First check if we have data, otherwise skip
+    unsigned int PointingBin = PointingBinsX[b] + PointingBinsZ[b]*FinalDirectionBins;
+    double PointingScaler = m_Pointing.Get(PointingBin);
+    
+    // Then create the rotation
+    vector<double> XPointing = m_Pointing.GetAxis(0).GetBinCenters(PointingBinsX[b]);
+    vector<double> ZPointing = m_Pointing.GetAxis(1).GetBinCenters(PointingBinsZ[b]);
+    cout<<XPointing[0]<<":"<<XPointing[1]<<endl;
+    cout<<ZPointing[0]<<":"<<ZPointing[1]<<endl;
+    
+    MRotationInterface RI;
+    RI.SetGalacticPointingXAxis(XPointing[1], XPointing[0]-90); // Convert to Galactic 
+    RI.SetGalacticPointingZAxis(ZPointing[1], ZPointing[0]-90); // Convert to Galactic 
+    MRotation R = RI.GetGalacticPointingInverseRotationMatrix(); //good
+    //MRotation R = RI.GetGalacticPointingRotationMatrix(); // wrong, but too good to believe
+
+    
+    // Precalculate the rotation map
+    // --> Problem: Some map to the same bin...
+    vector<unsigned int> RotatedBinMapping;
+    for (unsigned int id = 0; id < FinalDirectionBins; ++id) {
+      // Calculate the new detector pointing
+      vector<double> GalacticPointing = m_BackgroundModelGalactic.GetAxis(2).GetBinCenters(id);
+      //cout<<GalacticPointing[0]<<":"<<GalacticPointing[1]<<endl;
+      MVector GalIn;
+      GalIn.SetMagThetaPhi(1.0, GalacticPointing[0]*c_Rad, GalacticPointing[1]*c_Rad);
+      MVector LocalIn = R*GalIn;
+      
+      //cout<<R*GalIn<<" vs. "<<R2*GalIn<<" --> "<<LocalIn.Angle(R2*GalIn)*c_Deg<<endl;
+      
+      // Find that bin in the new response:
+      RotatedBinMapping.push_back(m_BackgroundModel.GetAxis(2).GetAxisBin(LocalIn.Theta()*c_Deg, LocalIn.Phi()*c_Deg));
+      
+      // cout<<"Mapping: "<<id<<"->"<<RotatedBinMapping[id]<<endl;
+    }
+    
+    
+    // Loop over the new response...
+    //! Logic: a1 + S1*a2 + S1*S2*a3 + S1*S2*S3*a4 + S1*S2*S3*S4*a5  
+    unsigned long M1 = 1;
+    unsigned long M2 = M1*FinalEnergyBins;
+    unsigned long M3 = M2*FinalPhiBins;
+    
+        
+    for (unsigned int fe = 0; fe < FinalEnergyBins; ++fe) {
+      unsigned long A1 = M1*fe;
+      unsigned long B1 = M1*fe;
+      for (unsigned int fp = 0; fp < FinalPhiBins; ++fp) {
+        unsigned long A2 = A1 + M2*fp;
+        unsigned long B2 = B1 + M2*fp;
+        for (unsigned int fd = 0; fd < FinalDirectionBins; ++fd) {
+              
+          unsigned int long A3 = A2 + M3*RotatedBinMapping[fd];
+          unsigned int long B3 = B2 + M3*fd;
+              
+          double ModelData = m_BackgroundModel.Get(A3)*PointingScaler; // Normalize by time in pointing  
+          if (ModelData == 0) continue;
+              
+          m_ThreadMutex.lock();
+          m_BackgroundModelGalactic.Add(B3, ModelData); 
+          m_ThreadMutex.unlock();
+        }
+      }
+    }
+
+  }
+  
+  m_ThreadRunning[ThreadID] = false;
+  
+  return true;
+}
+
+
+/******************************************************************************
  * Do whatever analysis is necessary
  */
-bool SimpleComptonImaging::Analyze()
+bool BinnedComptonImaging::Analyze()
 {
   // if (m_Interrupt == true) return false;
 
   // Open the response file - which determines the image data space grid...
   if (m_Response.Read(m_ResponseFileName) == false) {
-    mgui<<"Cannot read response file: \""<<m_ResponseFileName<<"\""<<endl;
+    mgui<<"Error: Cannot read response file: \""<<m_ResponseFileName<<"\""<<endl;
     return false;
+  }
+  
+  // Open the background model if the is any
+  bool UseBackgroundModel = false;
+  if (m_BackgroundModelFileName != "") UseBackgroundModel = true;
+  if (UseBackgroundModel == true) {
+    if (m_BackgroundModel.Read(m_BackgroundModelFileName) == false) {
+      mgui<<"Error: Cannot read background model file: \""<<m_BackgroundModelFileName<<"\""<<endl;
+      return false;
+    }
+    // Check if the dimensions are identical:
+    if (m_Response.GetAxis(2) != m_BackgroundModel.GetAxis(0) ||
+        m_Response.GetAxis(3) != m_BackgroundModel.GetAxis(1) ||
+        m_Response.GetAxis(4) != m_BackgroundModel.GetAxis(2)) {
+      mgui<<"Error: The response and background model axes arre not identical"<<endl;
+      return false;
+    }
+    
+    m_BackgroundModelGalactic.SetName("Response Galactic");
+    m_BackgroundModelGalactic.AddAxis(m_BackgroundModel.GetAxis(0)); // energy
+    m_BackgroundModelGalactic.AddAxis(m_BackgroundModel.GetAxis(1)); // phi
+    m_BackgroundModelGalactic.AddAxis(m_BackgroundModel.GetAxis(2)); // direction scattered gamma ray IN GALACTIC coordinates
   }
   
   MResponseMatrixON Image("Image");
@@ -606,6 +851,7 @@ bool SimpleComptonImaging::Analyze()
       }
     }
     
+    // Step 2: Do the actual rotation in parallel
     unsigned int Split = PointingBinsX.size() / std::thread::hardware_concurrency();
     if (Split == 0) {
       m_ThreadRunning.resize(1, true);
@@ -617,7 +863,7 @@ bool SimpleComptonImaging::Analyze()
         m_ThreadRunning[t] = true;
         vector<unsigned int> X(PointingBinsX.begin() + t*Split, (t == Threads.size() - 1) ? PointingBinsX.end() : PointingBinsX.begin() + (t+1)*Split);
         vector<unsigned int> Z(PointingBinsZ.begin() + t*Split, (t == Threads.size() - 1) ? PointingBinsZ.end() : PointingBinsZ.begin() + (t+1)*Split);
-        Threads[t] = thread(&SimpleComptonImaging::RotateResponseInParallel, this, t, X, Z);
+        Threads[t] = thread(&BinnedComptonImaging::RotateResponseInParallel, this, t, X, Z);
       }
       while (true) {
         bool Finished = true;
@@ -643,8 +889,148 @@ bool SimpleComptonImaging::Analyze()
     cout<<endl<<"Writing rotated response"<<endl;
     m_ResponseGalactic.Write("ResponseGalactic.rsp");
     cout<<"Number of directions in pointings file: "<<Dirs<<endl;
+    cout<<"Response Galactic normalization: "<<m_ResponseGalactic.GetSum()<<"  vs. "<<m_Response.GetSum()<<endl;
   }
 
+  double m_TotalBackgroundInModel = 0;
+  if (UseBackgroundModel == true) {
+    cout<<"Creating background model in Galactic coordinates"<<endl;
+    
+    // Step 1: Create a list of directions - pointing bins in this case
+    vector<unsigned int> PointingBinsX;
+    vector<unsigned int> PointingBinsZ;
+    int Dirs = 0;
+    // Create a new entry into the Galactic response for each pointing
+    for (unsigned int x = 0; x < InitialDirectionBins; ++x) {
+      for (unsigned int z = 0; z < InitialDirectionBins; ++z) {
+        //cout<<x<<"/"<<z<<"/"<<InitialDirectionBins<<endl;
+        
+        // First check if we have data, otherwise skip
+        unsigned int PointingBin = x + z*InitialDirectionBins;
+        if (m_Pointing.Get(PointingBin) == 0) continue;
+        Dirs++;
+        
+        PointingBinsX.push_back(x);
+        PointingBinsZ.push_back(z);
+      }
+    }
+    
+    // Step 2: Do the actual rotation in parallel
+    unsigned int Split = PointingBinsX.size() / std::thread::hardware_concurrency();
+    if (Split == 0) {
+      m_ThreadRunning.resize(1, true);
+      RotateBackgroundModelInParallel(0, PointingBinsX, PointingBinsZ);
+    } else {
+      vector<thread> Threads(std::thread::hardware_concurrency());
+      m_ThreadRunning.resize(Threads.size(), true);
+      for (unsigned int t = 0; t < Threads.size(); ++t) {
+        m_ThreadRunning[t] = true;
+        vector<unsigned int> X(PointingBinsX.begin() + t*Split, (t == Threads.size() - 1) ? PointingBinsX.end() : PointingBinsX.begin() + (t+1)*Split);
+        vector<unsigned int> Z(PointingBinsZ.begin() + t*Split, (t == Threads.size() - 1) ? PointingBinsZ.end() : PointingBinsZ.begin() + (t+1)*Split);
+        Threads[t] = thread(&BinnedComptonImaging::RotateBackgroundModelInParallel, this, t, X, Z);
+      }
+      while (true) {
+        bool Finished = true;
+        for (unsigned int t = 0; t < Threads.size(); ++t) {
+          if (m_ThreadRunning[t] == true) {
+            Finished = false;
+            break;
+          }
+        }
+        if (Finished == false) {
+          this_thread::sleep_for(chrono::milliseconds(1));
+        } else {
+          for (unsigned int t = 0; t < Threads.size(); ++t) {
+            Threads[t].join();
+          }
+          break;
+        }
+      }
+    }
+    
+    // RotateResponseInParallel(PointingBinsX, PointingBinsZ);
+    
+    cout<<endl<<"Writing rotated response"<<endl;
+    m_BackgroundModelGalactic.Write("BackgroundModelGalactic.rsp");
+    cout<<"Number of directions in pointings file: "<<Dirs<<endl;
+    
+    m_TotalBackgroundInModel = m_BackgroundModelGalactic.GetSum();
+    
+    
+    // Backproject background model
+    {
+      MTimer T;
+      
+      MResponseMatrixON BackprojectedBackground("Image");
+      BackprojectedBackground.AddAxis(m_Response.GetAxis(0)); // energy
+      BackprojectedBackground.AddAxis(m_Response.GetAxis(1)); // image space
+      
+      //! Logic: a1 + S1*a2 + S1*S2*a3 + S1*S2*S3*a4 + S1*S2*S3*S4*a5  
+      unsigned long M1 = 1;
+      unsigned long M2 = M1*InitialEnergyBins;
+      unsigned long M3 = M2*InitialDirectionBins;
+      unsigned long M4 = M3*FinalEnergyBins;
+      unsigned long M5 = M4*FinalPhiBins;
+      for (unsigned int ie = 0; ie < InitialEnergyBins; ++ie) {
+        unsigned long A1 = M1*ie;
+        for (unsigned int id = 0; id < InitialDirectionBins; ++id) {
+          unsigned long A2 = A1 + M2*id;
+          float Content = 0.0;
+          for (unsigned int fe = 0; fe < FinalEnergyBins; ++fe) {
+            unsigned long A3 = A2 + M3*fe;
+            unsigned int D1 = 1*fe;
+            for (unsigned int fp = 0; fp < FinalPhiBins; ++fp) {
+              unsigned long A4 = A3 + M4*fp;
+              unsigned int D2 = D1 +fp*FinalEnergyBins;
+              for (unsigned int fd = 0; fd < FinalDirectionBins; ++fd) {
+                Content += m_ResponseGalactic.Get(A4 + M5*fd) * m_BackgroundModelGalactic.Get(D2 + fd*FinalEnergyBins*FinalPhiBins);
+              }
+            }
+          }
+          BackprojectedBackground.Set(vector<unsigned int>{ ie, id }, Content);
+        }
+      }
+      cout<<"Done: "<<T.GetElapsed()<<endl;
+      
+      // Normalize image to 1.0
+      double Sum = BackprojectedBackground.GetSum();
+      if (Sum == 0) {
+        cout<<"Error: First backprojection sum image is zero"<<endl;
+        return false;
+      }
+      if (isfinite(Sum) == false) {
+        cout<<"Error: First backprojection image contains non-finite number."<<endl;
+        return false;
+      }
+      BackprojectedBackground *= 1.0/BackprojectedBackground.GetSum();
+      
+      BackprojectedBackground.ShowSlice(vector<float>{ 511.0, MResponseMatrix::c_ShowX, MResponseMatrix::c_ShowY }, true);  
+      gSystem->ProcessEvents();
+      
+      BackprojectedBackground.Write("BackprojectedBackground.rsp");
+      
+      vector<double> BackprojectedBackgroundData(BackprojectedBackground.GetAxis(1).GetNumberOfBins());
+      for (unsigned int ie = 0; ie < InitialEnergyBins; ++ie) {
+        for (unsigned int id = 0; id < InitialDirectionBins; ++id) {
+          BackprojectedBackgroundData[id] = BackprojectedBackground.Get(ie + InitialEnergyBins*id);
+        }
+      }
+      
+      MImageGalactic* G = new MImageGalactic();
+      G->SetTitle("Backprojected background");
+      G->SetXAxisTitle("Galactic Longitude [deg]");
+      G->SetYAxisTitle("Galactic Latitude [deg]");
+      G->SetValueAxisTitle("Flux");
+      G->SetDrawOption(MImage::c_COLZ);
+      G->SetSpectrum(MImage::c_Rainbow);
+      G->SetSourceCatalog("$(MEGALIB)/resource/catalogs/Crab.scat");
+      G->Normalize(false);
+      G->SetFISBEL(BackprojectedBackgroundData);
+      G->Display();
+      
+      
+    }
+  }
    
   
   // Create an initial backprojection
@@ -697,9 +1083,31 @@ bool SimpleComptonImaging::Analyze()
     gSystem->ProcessEvents();
     
     Image.Write("FirstBackprojection.rsp");
+    
+    vector<double> BackprojectedDataData(Image.GetAxis(1).GetNumberOfBins());
+    for (unsigned int ie = 0; ie < InitialEnergyBins; ++ie) {
+      for (unsigned int id = 0; id < InitialDirectionBins; ++id) {
+        BackprojectedDataData[id] = Image.Get(ie + InitialEnergyBins*id);
+      }
+    }
+    
+    MImageGalactic* G = new MImageGalactic();
+    G->SetTitle("1st backprojection");
+    G->SetXAxisTitle("Galactic Longitude [deg]");
+    G->SetYAxisTitle("Galactic Latitude [deg]");
+    G->SetValueAxisTitle("Flux");
+    G->SetDrawOption(MImage::c_COLZ);
+    G->SetSpectrum(MImage::c_Rainbow);
+    G->SetSourceCatalog("$(MEGALIB)/resource/catalogs/Crab.scat");
+    G->Normalize(false);
+    G->SetFISBEL(BackprojectedDataData);
+    G->Display();
+    
+    
   }
 
   
+  // Maximum entropy
   if (m_UseMaximumEntropy == true) {
     
     // Set up Lagrange multipliers
@@ -707,7 +1115,7 @@ bool SimpleComptonImaging::Analyze()
     MResponseMatrixON Lagrange;
     Lagrange.AddAxis(m_ResponseGalactic.GetAxis(2)); // energy
     Lagrange.AddAxis(m_ResponseGalactic.GetAxis(3)); // phi
-    Lagrange.AddAxis(m_ResponseGalactic.GetAxis(4)); // diretcion scattered gamma ray  
+    Lagrange.AddAxis(m_ResponseGalactic.GetAxis(4)); // direction scattered gamma ray  
     
     unsigned long P1 = 1;
     unsigned long P2 = P1*FinalEnergyBins;
@@ -735,6 +1143,8 @@ bool SimpleComptonImaging::Analyze()
     Expectation.AddAxis(m_ResponseGalactic.GetAxis(2)); // energy
     Expectation.AddAxis(m_ResponseGalactic.GetAxis(3)); // phi
     Expectation.AddAxis(m_ResponseGalactic.GetAxis(4)); // diretcion scattered gamma ray  
+    
+    double BackgroundScaler = 1.0;
     
     double MaximumEntropy = 0;
     int MaximumIterations = 0;
@@ -825,6 +1235,11 @@ bool SimpleComptonImaging::Analyze()
                 NewExpectation += RestoredImage.Get(ie + InitialEnergyBins*id) * m_ResponseGalactic.Get(ie + P2*id + P3*fe + P4*fp + P5*fd);
               }
             }
+            
+            if (UseBackgroundModel == true) {
+              NewExpectation += BackgroundScaler * m_BackgroundModelGalactic.Get(fe + FinalEnergyBins*fp + FinalEnergyBins*FinalPhiBins*fd);
+            }            
+            
             Expectation.Set(fe + FinalEnergyBins*fp + FinalEnergyBins*FinalPhiBins*fd, NewExpectation);
           }
         }
@@ -849,6 +1264,7 @@ bool SimpleComptonImaging::Analyze()
      
       int LCounter = 0; 
       double Limit = 1.0E-9;
+      double UpdateFactor = 5000;
       unsigned long Q1 = 1;
       unsigned long Q2 = Q1*FinalEnergyBins;
       unsigned long Q3 = Q2*FinalPhiBins;
@@ -870,16 +1286,16 @@ bool SimpleComptonImaging::Analyze()
               if (PreLog2 < Limit) PreLog2 = Limit;
               Update -= log(PreLog2);
            
-              cout<<"Lagrange diff: "<<Lagrange.Get(A3)<<" vs. "<<Data.Get(A3)*Scale<<" vs. "<<Expectation.Get(A3)<<" --> Update: "<<Update<<endl;
+              //cout<<"Lagrange diff: "<<Lagrange.Get(A3)<<" vs. "<<Data.Get(A3)*Scale<<" vs. "<<Expectation.Get(A3)<<" --> Update: "<<Update<<endl;
  
             } else {
               Update += Data.Get(A3)*Scale - Expectation.Get(A3);
-              cout<<"Lagrange diff: "<<Lagrange.Get(A3)<<" vs. "<<Data.Get(A3)*Scale<<" vs. "<<Expectation.Get(A3)<<" --> Update: "<<Update<<endl;
+              //cout<<"Lagrange diff: "<<Lagrange.Get(A3)<<" vs. "<<Data.Get(A3)*Scale<<" vs. "<<Expectation.Get(A3)<<" --> Update: "<<Update<<endl;
 
             }
               
             //cout<<"Lagrange diff: "<<Lagrange.Get(A3)<<" vs. "<<Update<<endl;
-            double NewL = Lagrange.Get(A3) + 10000*Update;
+            double NewL = Lagrange.Get(A3) + UpdateFactor*Update;
             if (NewL < 0) {
               NewL = 0;
             }
@@ -892,8 +1308,34 @@ bool SimpleComptonImaging::Analyze()
       cout<<"Lagrange sum="<<Lagrange.GetSum()<<endl;
       
       
+      // Step 4: Update the background scaling factor:
+      if (UseBackgroundModel == true) {
+        double B_corr = 0;
+        
+        unsigned long N1 = 1;
+        unsigned long N2 = N1*FinalEnergyBins;
+        unsigned long N3 = N2*FinalPhiBins;
+        for (unsigned int fe = 0; fe < FinalEnergyBins; ++fe) {
+          unsigned long B1 = N1*fe;
+          for (unsigned int fp = 0; fp < FinalPhiBins; ++fp) {
+            unsigned long B2 = B1 + N2*fp;
+            for (unsigned int fd = 0; fd < FinalDirectionBins; ++fd) {
+              unsigned long B3 = B2 + N3*fd;
+              
+              if (Data.Get(B3) > 0 && Expectation.Get(B3) > 0) {
+                B_corr += m_BackgroundModelGalactic.Get(B3) * Data.Get(B3) / Expectation.Get(B3);
+              }
+            }
+          }
+        }
+        
+        BackgroundScaler *= B_corr / m_TotalBackgroundInModel;
+        
+        cout<<"Background scaling factor: "<<BackgroundScaler<<"!"<<B_corr<<"!"<<m_TotalBackgroundInModel<<endl;
+      }      
       
-      // Step 4: Update the real image:
+      
+      // Step 5: Update the real image:
       MResponseMatrixON NewImage("NewImage");
       NewImage.AddAxis(m_Response.GetAxis(0)); // energy
       NewImage.AddAxis(m_Response.GetAxis(1)); // image space
@@ -915,24 +1357,46 @@ bool SimpleComptonImaging::Analyze()
       
       ostringstream Title;
       Title<<"Image at iteration "<<i+1<<" with flux "<<ImageFlux<<" ph/cm2/s";
-      NewImage.ShowSlice(vector<float>{ 511.0, MResponseMatrix::c_ShowX, MResponseMatrix::c_ShowY }, true, Title.str());
+      //NewImage.ShowSlice(vector<float>{ 511.0, MResponseMatrix::c_ShowX, MResponseMatrix::c_ShowY }, true, Title.str());
       cout<<"Image content: "<<ImageFlux<<" ph/cm2/s"<<endl;
      
-
+      vector<double> ImageData(NewImage.GetAxis(1).GetNumberOfBins());
+      for (unsigned int ie = 0; ie < InitialEnergyBins; ++ie) {
+        for (unsigned int id = 0; id < InitialDirectionBins; ++id) {
+          ImageData[id] = NewImage.Get(ie + InitialEnergyBins*id);
+        }
+      }
+      
+      MImageGalactic* G = new MImageGalactic();
+      G->SetTitle("Galaxy view");
+      G->SetXAxisTitle("Galactic Longitude [deg]");
+      G->SetYAxisTitle("Galactic Latitude [deg]");
+      G->SetValueAxisTitle("Flux");
+      G->SetDrawOption(MImage::c_COLZ);
+      G->SetSpectrum(MImage::c_Rainbow);
+      G->SetSourceCatalog("$(MEGALIB)/resource/catalogs/Crab.scat");
+      G->Normalize(false);
+      G->SetFISBEL(ImageData);
+      G->Display();
+      
+      //NewImage.Write(MString("Image_") + (i+1) + ".rsp");
+      
+      gSystem->ProcessEvents();
+      
       if (m_Interrupt == true) break;
  
     } // iterations
-   
-
-
- 
-  } else {
+  } 
+  
+  // Maximum likelihood
+  else {
     // The iterations
     MResponseMatrixON Mean;
     Mean.AddAxis(m_ResponseGalactic.GetAxis(2)); // energy
     Mean.AddAxis(m_ResponseGalactic.GetAxis(3)); // phi
     Mean.AddAxis(m_ResponseGalactic.GetAxis(4)); // diretcion scattered gamma ray  
     
+    double BackgroundScaler = 1.0;
     
     double MaximumEntropy = 0;
     int MaximumIterations = 0;
@@ -963,14 +1427,46 @@ bool SimpleComptonImaging::Analyze()
                 //NewMean += Image.Get(vector<unsigned int>{ie, id}) * m_ResponseGalactic.Get(vector<unsigned int>{ie, id, fe, fp, fd});
               }
             }
+            
+            if (UseBackgroundModel == true) {
+              NewMean += BackgroundScaler * m_BackgroundModelGalactic.Get(fe + FinalEnergyBins*fp + FinalEnergyBins*FinalPhiBins*fd);
+            }
+            
             Mean.Set(fe + FinalEnergyBins*fp + FinalEnergyBins*FinalPhiBins*fd, NewMean);
-            //Mean.Set(vector<unsigned int>{fe, fp, fd}, NewMean);
+            //Mean.Set(vector<unCrabAndBackground.Moving2.p2.trasigned int>{fe, fp, fd}, NewMean);
           }
         }
       }
       
       Mean.Write(MString("Mean_") + (i+1) + ".rsp");
       cout<<"Iteration: "<<i+1<<" - deconvolve"<<endl;
+      
+      // Now deconvolve the background scaling factor first :
+      if (UseBackgroundModel == true) {
+        double B_corr = 0;
+        
+        unsigned long N1 = 1;
+        unsigned long N2 = N1*FinalEnergyBins;
+        unsigned long N3 = N2*FinalPhiBins;
+        for (unsigned int fe = 0; fe < FinalEnergyBins; ++fe) {
+          unsigned long B1 = N1*fe;
+          for (unsigned int fp = 0; fp < FinalPhiBins; ++fp) {
+            unsigned long B2 = B1 + N2*fp;
+            for (unsigned int fd = 0; fd < FinalDirectionBins; ++fd) {
+              unsigned long B3 = B2 + N3*fd;
+              
+              if (Data.Get(B3) > 0 && Mean.Get(B3) > 0) {
+                B_corr += m_BackgroundModelGalactic.Get(B3) * Data.Get(B3) / Mean.Get(B3);
+              }
+            }
+          }
+        }
+        
+        BackgroundScaler *= B_corr / m_TotalBackgroundInModel;
+        
+        cout<<"Background scaling factor: "<<BackgroundScaler<<"!"<<B_corr<<"!"<<m_TotalBackgroundInModel<<endl;
+      }
+      
       
       double ImageFlux = 0.0;
       
@@ -1007,21 +1503,13 @@ bool SimpleComptonImaging::Analyze()
                   Content += m_ResponseGalactic.Get(A5) * Data.Get(B3) / Mean.Get(B3);
                 }
                 Sum += m_ResponseGalactic.Get(A5);
-                
-                /*
-                 *            // Slow version
-                 *            if (Mean.Get(vector<unsigned int>{fe, fp, fd}) > 0) {
-                 *              Content += m_ResponseGalactic.Get(vector<unsigned int>{ie, id, fe, fp, fd}) * Data.Get(vector<unsigned int>{fe, fp, fd}) / Mean.Get(vector<unsigned int>{fe, fp, fd});
-              }
-              Sum += m_ResponseGalactic.Get(vector<unsigned int>{ie, id, fe, fp, fd});
-              */
               }
             }
           }
           if (Sum > 0) {
             NewImage.Set(A2, Content);
             Image.Set(A2, Content * Image.Get(A2) / Sum);
-            ImageFlux += Content * Image.Get(A2) / Sum / ObservationTime / StartArea;
+            ImageFlux += (Content * Image.Get(A2) / Sum) / ObservationTime / StartArea;
             Display.Set(A2, Content * Image.Get(A2) / Sum / ObservationTime / StartArea / Steradians );
             //Image.Set(vector<unsigned int>{ie, id}, Content * Image.Get(vector<unsigned int>{ie, id}) / Sum);
             gSystem->ProcessEvents();
@@ -1029,13 +1517,33 @@ bool SimpleComptonImaging::Analyze()
         }
       }
       
+      
       ostringstream Title;
       Title<<"Image at iteration "<<i+1<<" with flux "<<ImageFlux<<" ph/cm2/s";
       
-      Display.ShowSlice(vector<float>{ 511.0, MResponseMatrix::c_ShowX, MResponseMatrix::c_ShowY }, true, Title.str());
-      cout<<"Image content: "<<ImageFlux<<" ph/cm2/s"<<endl;
+      //Display.ShowSlice(vector<float>{ 511.0, MResponseMatrix::c_ShowX, MResponseMatrix::c_ShowY }, true, Title.str());
+      cout<<"Image content: "<<ImageFlux<<" ph/cm2/s for T="<<ObservationTime<<" sec and A="<<StartArea<<" cm^2"<<endl;
       
-      Display.Write(MString("Image_") + (i+1) + ".rsp");
+      vector<double> ImageData(Display.GetAxis(1).GetNumberOfBins());
+      for (unsigned int ie = 0; ie < InitialEnergyBins; ++ie) {
+        for (unsigned int id = 0; id < InitialDirectionBins; ++id) {
+          ImageData[id] = Display.Get(ie + InitialEnergyBins*id);
+        }
+      }
+      
+      MImageGalactic* G = new MImageGalactic();
+      G->SetTitle("Galaxy view");
+      G->SetXAxisTitle("Galactic Longitude [deg]");
+      G->SetYAxisTitle("Galactic Latitude [deg]");
+      G->SetValueAxisTitle("Flux");
+      G->SetDrawOption(MImage::c_COLZ);
+      G->SetSpectrum(MImage::c_Rainbow);
+      G->SetSourceCatalog("$(MEGALIB)/resource/catalogs/Crab.scat");
+      G->Normalize(false);
+      G->SetFISBEL(ImageData);
+      G->Display();
+      
+      //Display.Write(MString("Image_") + (i+1) + ".rsp");
       
       gSystem->ProcessEvents();
       
@@ -1043,6 +1551,7 @@ bool SimpleComptonImaging::Analyze()
     }
   }
   
+  gSystem->ProcessEvents();  
   
   return true;
 }
@@ -1051,7 +1560,7 @@ bool SimpleComptonImaging::Analyze()
 /******************************************************************************
  * Analyze the event, return true if it has to be writen to file
  */
-bool SimpleComptonImaging::AnalyzeEvent(MSimEvent& Event)
+bool BinnedComptonImaging::AnalyzeEvent(MSimEvent& Event)
 {
   // Add your code here
   // Return true if the event should be written to file
@@ -1065,7 +1574,7 @@ bool SimpleComptonImaging::AnalyzeEvent(MSimEvent& Event)
 
 /******************************************************************************/
 
-SimpleComptonImaging* g_Prg = 0;
+BinnedComptonImaging* g_Prg = 0;
 int g_NInterrupts = 2;
 
 /******************************************************************************/
@@ -1104,9 +1613,9 @@ int main(int argc, char** argv)
   // Initialize global MEGAlib variables, especially mgui, etc.
   MGlobal::Initialize();
   
-  TApplication SimpleComptonImagingApp("SimpleComptonImagingApp", 0, 0);
+  TApplication BinnedComptonImagingApp("BinnedComptonImagingApp", 0, 0);
 
-  g_Prg = new SimpleComptonImaging();
+  g_Prg = new BinnedComptonImaging();
 
   if (g_Prg->ParseCommandLine(argc, argv) == false) {
     cerr<<"Error during parsing of command line!"<<endl;
@@ -1117,7 +1626,7 @@ int main(int argc, char** argv)
     return -2;
   } 
 
-  SimpleComptonImagingApp.Run();
+  BinnedComptonImagingApp.Run();
 
   cout<<"Program exited normally!"<<endl;
 
