@@ -72,6 +72,7 @@ MERTrackKalman3D::MERTrackKalman3D() : MERTrack()
   max_offset=30.;
   start_nrg_fit=20;
   n_fit = 7;
+
 }
 
 
@@ -114,10 +115,9 @@ bool MERTrackKalman3D::EvaluateTracks(MRERawEvent* RE)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MERTrackKalman3D::SetSpecialParameters(double HeightX0, double SigmaHitPos, unsigned int NLayersForVertexSearch)
+bool MERTrackKalman3D::SetSpecialParameters(double SigmaHitPos, unsigned int NLayersForVertexSearch)
 {
   m_NLayersForVertexSearch = NLayersForVertexSearch;
-  m_heightX0 = HeightX0;
   m_sigma = SigmaHitPos;
 
   if (m_NLayersForVertexSearch < 4) {
@@ -153,9 +153,7 @@ MString MERTrackKalman3D::ToString(bool CoreOnly) const
 
 
 ////////////////////////////////////////////////////////////////////////////////
-
-
-/*MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
+MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 {
   // Check if this event could be a pair:
   //
@@ -271,12 +269,17 @@ MString MERTrackKalman3D::ToString(bool CoreOnly) const
 
     if (Vertex != 0) {
       if (List == 0) List = new MRawEventList();
-      break; // Only take first right now
+      RE->SetVertex(Vertex);
+      RE->SetVertexDirection(-1);
+      MRERawEvent *New = RE->Duplicate();
+      RE->SetVertex(0);
+      List->AddRawEvent(New);
+      mdebug<<"Search vertex: Found vertex: "<<Vertex->GetID()<<endl;
+      return List; // Only take first right now
     }
   }
 
-  if (Vertex != 0){
-    MRESE* PrelVertex = Vertex;
+  if (Vertex == 0){
     vector < Float_t > Chi2;
     vector < Int_t > ID;
 
@@ -311,38 +314,226 @@ MString MERTrackKalman3D::ToString(bool CoreOnly) const
       tie(Track1, E1, ChiT1, Track2, E2, ChiT2, Chosen1, Chosen2) = SearchTracks(RE);
 
       if ((ChiT1==0. && ChiT2==0.) || !(Chosen1.GetNRESEs()>2 && Chosen2.GetNRESEs()>2)) continue;
-      if((*Iterator1)==PrelVertex) Chi2.push_back(ChiT1+ChiT2-sfg_factor);
-      else Chi2.push_back(ChiT1+ChiT2);
+      Chi2.push_back(ChiT1+ChiT2);
       ID.push_back((*Iterator1)->GetID());
     }
 
-    for (UInt_t i = 0; i < Chi2.size(); i++) {
-      if(Chi2[i]==*min_element(Chi2.begin(), Chi2.end())) {
-        Vertex=RE->GetRESE(ID[i]);
+    if (Chi2.size()==0) return List;
+
+    if (*min_element(Chi2.begin(), Chi2.end())<=50){
+      for (UInt_t i = 0; i < Chi2.size(); i++) {
+        if(Chi2[i]==*min_element(Chi2.begin(), Chi2.end())) {
+          Vertex=RE->GetRESE(ID[i]);
+        }
       }
     }
 
     if (Vertex != 0 ) {
       if (List == 0) List = new MRawEventList();
       VertexDirection = -1;
-      RE->SetVertex(PrelVertex);
+      RE->SetVertex(Vertex);
       RE->SetVertexDirection(VertexDirection);
       MRERawEvent *New = RE->Duplicate();
       //RE->SetVertex(0);
       List->AddRawEvent(New);
-      if (Vertex != PrelVertex && PrelVertex->GetPosition().Z()<Vertex->GetPosition().Z()) {
-        cout<<"Original vertex: "<<PrelVertex->GetPosition().X()<<" "<<PrelVertex->GetPosition().Y()<<" "<<PrelVertex->GetPosition().Z()<<endl;
-        cout<<"New vertex: "<<Vertex->GetPosition().X()<<" "<<Vertex->GetPosition().Y()<<" "<<Vertex->GetPosition().Z()<<endl;
-        print=true;
-      }
+
+      mdebug<<"Vertex: "<<Vertex->GetPosition().X()<<" "<<Vertex->GetPosition().Y()<<" "<<Vertex->GetPosition().Z()<<" "<<*min_element(Chi2.begin(), Chi2.end())<<endl;
       mdebug<<"Search vertex: Found vertex: "<<Vertex->GetID()<<endl;
     }
     //}
   }
   return List;
 }
-*/
 
+
+/*MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
+{
+// Check if this event could be a pair:
+//
+// The typical pattern of a pair is:
+// (a) There is a vertex
+// (b) In N layers above/below are at least two hits
+
+// Search the vertex:
+// The vertex is at this point a (non-ambiguous) track or a single (clustered)
+// hit followed by at least N layers with two hits per layer:
+
+mdebug<<"Searching for a pair vertex"<<endl;
+MRESE* Vertex = 0;
+MRawEventList *List = 0;
+bool OnlyHitInLayer = false;
+//unsigned int MaximumLayerJump = 2;
+//MRESE* RESE = 0;
+unsigned int SearchRange = 30;
+//int MinPairLength = m_NLayersForVertexSearch;
+
+// Create a list of RESEs sorted by depth in tracker
+vector<MRESE*> ReseList;
+for (int h = 0; h < RE->GetNRESEs(); h++) {
+if (IsInTracker(RE->GetRESEAt(h)) == false) continue;
+// Everthing below 90 has to go -- eliminate Bremsstrahlung
+//if (RE->GetRESEAt(h)->GetEnergy() < 90) continue;
+
+ReseList.push_back(RE->GetRESEAt(h));
+}
+sort(ReseList.begin(), ReseList.end(), CompareRESEByZ());
+
+mdebug<<"RESE's sorted by depth: "<<endl;
+vector<MRESE*>::iterator Iterator1;
+vector<MRESE*>::iterator Iterator2;
+for (Iterator1 = ReseList.begin(); Iterator1 != ReseList.end(); Iterator1++) {
+mdebug<<(*Iterator1)->GetID()<<": "<<(*Iterator1)->GetPosition().Z()<<endl;
+}
+
+// For each of the RESE's in the list check if it could be the first of the vertex
+for (Iterator1 = ReseList.begin(); Iterator1 != ReseList.end(); Iterator1++) {
+
+// If it is a single hit, and if it is the only one in its layer:
+OnlyHitInLayer = true;
+for (Iterator2 = ReseList.begin(); Iterator2 != ReseList.end(); Iterator2++) {
+if ((*Iterator1) == (*Iterator2)) continue;
+if (m_Geometry->AreInSameLayer((*Iterator1), (*Iterator2)) == true) {
+OnlyHitInLayer = false;
+break;
+}
+}
+if (OnlyHitInLayer == false) continue;
+mdebug<<"Search vertex: Only hit in layer:"<<endl;
+mdebug<<(*Iterator1)->ToString()<<endl;
+
+// We only have one hit:
+vector<int> NBelow(SearchRange, 0);
+vector<int> NAbove(SearchRange, 0);
+
+int Distance;
+for (Iterator2 = ReseList.begin(); Iterator2 != ReseList.end(); Iterator2++) {
+if ((*Iterator1) == (*Iterator2)) continue;
+// Ignore small energy deposits equivalent to bremsstrahlung
+//if ((*Iterator2)->GetEnergy() < 90) continue;
+
+Distance = m_Geometry->GetLayerDistance((*Iterator1), (*Iterator2));
+if (Distance > 0 && Distance < int(SearchRange)) NAbove[Distance]++;
+if (Distance < 0 && abs(Distance) < int(SearchRange)) NBelow[abs(Distance)]++;
+massert(Distance != 0); // In this case the algorithm is broken...
+//mdebug<<"Distance "<<(*Iterator1)->GetID()<<" - "<<(*Iterator2)->GetID()<<": "<<Distance<<endl;
+}
+
+
+// Under the following conditions we do have a pair:
+
+// Check for vertex below
+if (NAbove[1] == 0) {
+int StartIndex = 0; // We start when we have 2 hits for the first time
+int StopIndex = 0; // We stop when we skip 2 layers for the first time
+int LayersWithAtLeastTwoHitsBetweenStartAndStop = 0;
+
+
+for (unsigned int d = 1; d < SearchRange-1; ++d) {
+// We stop when we skip 2 layers for the first time
+if (NBelow[d] == 0 && NBelow[d+1] == 0) break;
+StopIndex = d;
+// Store the index where we have 2 hits for the first time, twice
+if (StartIndex == 0 && NBelow[d] > 1 && NBelow[d+2] > 1) StartIndex = d;
+
+if (StartIndex != 0) {
+if (NBelow[d] >= 2) ++LayersWithAtLeastTwoHitsBetweenStartAndStop;
+}
+}
+
+// Since we can have just a single track at the end, move upward until we have at least two hits in a row
+for (unsigned int d = StopIndex; d > 2; --d) {
+if (NBelow[d-1] >= 2 && NBelow[d-2] >= 2) break;
+StopIndex = d;
+}
+
+mdebug<<"Search vertex ("<<(*Iterator1)->GetPosition().Z()<<"): Above: ";
+for (int i: NAbove) mdebug<<i<<" ";
+mdebug<<endl;
+mdebug<<"Search vertex ("<<(*Iterator1)->GetPosition().Z()<<"): Below: ";
+for (int i: NBelow) mdebug<<i<<" ";
+mdebug<<endl;
+
+mdebug<<"Vertex statistics (max: "<<SearchRange<<"): layers used: "<<StopIndex<<", start of 2+ hits: "<<StartIndex<<"  layers with 2+ hits between start and stop: "<<LayersWithAtLeastTwoHitsBetweenStartAndStop<<" ("<<((StopIndex-StartIndex > 0) ? 100.0*LayersWithAtLeastTwoHitsBetweenStartAndStop/(StopIndex-StartIndex) : 0)<<"%)"<<endl;
+
+if (LayersWithAtLeastTwoHitsBetweenStartAndStop > 4 && double (LayersWithAtLeastTwoHitsBetweenStartAndStop)/(StopIndex-StartIndex) > 0.5) {
+Vertex = (*Iterator1);
+}
+}
+
+if (Vertex != 0) {
+if (List == 0) List = new MRawEventList();
+break; // Only take first right now
+}
+}
+
+if (Vertex != 0){
+MRESE* PrelVertex = Vertex;
+vector < Float_t > Chi2;
+vector < Int_t > ID;
+
+Int_t nplanes = 0;
+Double_t PlaneZ = (*ReseList.begin())->GetPosition().Z();
+
+// Pair starting from top
+
+int VertexDirection = 0;
+
+for (Iterator1 = ReseList.begin(); Iterator1 != ReseList.end() && nplanes<2; Iterator1++) {
+if (IsInTracker(*Iterator1) == false) continue;
+
+if (abs(PlaneZ - (*Iterator1)->GetPosition().Z())>  + 0.0001){
+nplanes++;
+PlaneZ = (*Iterator1)->GetPosition().Z();
+}
+Float_t ChiT1=0.;
+Float_t ChiT2=0.;
+
+vector < TMatrix > Track1;
+vector < TMatrix > Track2;
+
+Float_t E1=0.;
+Float_t E2=0.;
+
+MRESEList Chosen1;
+MRESEList Chosen2;
+
+RE->SetVertex(*Iterator1);
+
+tie(Track1, E1, ChiT1, Track2, E2, ChiT2, Chosen1, Chosen2) = SearchTracks(RE);
+
+if ((ChiT1==0. && ChiT2==0.) || !(Chosen1.GetNRESEs()>2 && Chosen2.GetNRESEs()>2)) continue;
+if((*Iterator1)==PrelVertex) Chi2.push_back(ChiT1+ChiT2-sfg_factor);
+else Chi2.push_back(ChiT1+ChiT2);
+ID.push_back((*Iterator1)->GetID());
+}
+
+for (UInt_t i = 0; i < Chi2.size(); i++) {
+if(Chi2[i]==*min_element(Chi2.begin(), Chi2.end())) {
+Vertex=RE->GetRESE(ID[i]);
+}
+}
+
+if (Vertex != 0 ) {
+if (List == 0) List = new MRawEventList();
+VertexDirection = -1;
+RE->SetVertex(PrelVertex);
+RE->SetVertexDirection(VertexDirection);
+MRERawEvent *New = RE->Duplicate();
+//RE->SetVertex(0);
+List->AddRawEvent(New);
+if (Vertex != PrelVertex && PrelVertex->GetPosition().Z()<Vertex->GetPosition().Z()) {
+cout<<"Original vertex: "<<PrelVertex->GetPosition().X()<<" "<<PrelVertex->GetPosition().Y()<<" "<<PrelVertex->GetPosition().Z()<<endl;
+cout<<"New vertex: "<<Vertex->GetPosition().X()<<" "<<Vertex->GetPosition().Y()<<" "<<Vertex->GetPosition().Z()<<endl;
+//print=true;
+}
+mdebug<<"Search vertex: Found vertex: "<<Vertex->GetID()<<endl;
+}
+//}
+}
+return List;
+}
+
+*/
 ////////////////////////////////////////////////////////////////////////////////
 
 Float_t MERTrackKalman3D::Kalman(MRERawEvent* RE, Int_t n, Float_t en, MRESEList Previous, vector < TMatrix > &trk, MRESEList &Chosen)
@@ -360,7 +551,7 @@ Float_t MERTrackKalman3D::Kalman(MRERawEvent* RE, Int_t n, Float_t en, MRESEList
   vector < TMatrix > xsmoothk;
 
   Float_t _planedistance = 0.;
-  Float_t height = m_heightX0*9.37;
+
 
   TMatrix C(4,4);
   TMatrix C_proj(4,4);
@@ -375,6 +566,10 @@ Float_t MERTrackKalman3D::Kalman(MRERawEvent* RE, Int_t n, Float_t en, MRESEList
   Float_t chi2 = 0.;
   MRESE vertex = RE->GetVertex();
   Chosen.AddRESE(RE->GetVertex());
+
+  Float_t height = 2*vertex.GetVolumeSequence()->GetDetector()->GetStructuralSize().GetZ();
+  m_heightX0 = height/vertex.GetVolumeSequence()->GetDetector()->GetSensitiveVolume(0)->GetMaterial()->GetRadiationLength();
+
   //Filtering
   Float_t t;// tan of the RMS of the scattering angle
 
@@ -454,14 +649,7 @@ Float_t MERTrackKalman3D::Kalman(MRERawEvent* RE, Int_t n, Float_t en, MRESEList
 
   Float_t PlaneZ = vertex.GetPosition().Z();
 
-  Float_t LayerDistance = 0.;
-
-  for (int r = 1; r < List.GetNRESEs(); r++) {
-    if(m_Geometry->GetLayerDistance(List.GetRESEAt(r-1), List.GetRESEAt(r)) == -1){
-      LayerDistance=List.GetRESEAt(r-1)->GetPosition().Z()-List.GetRESEAt(r)->GetPosition().Z();
-      break;
-    }
-  }
+  Float_t LayerDistance = vertex.GetVolumeSequence()->GetDetector()->GetStructuralPitch().GetZ();
 
   for (int r = 0; r < List.GetNRESEs() && i<n-1; r++) {
 
@@ -681,7 +869,7 @@ tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t
 
   vector < TMatrix > trk1;
   vector < TMatrix > trk2;
-  mdebug<<"First track: "<<endl;
+
   PrevChoice.RemoveAllRESEs();
   PrevChoice.Compress();
 
@@ -697,8 +885,9 @@ tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t
     nrg_est1=0.;
 
     //Energy Estimation
-    //nrg_est1 = MultipleScattering(trk1);
-    nrg_est1 = EnergyEst3D(trk1);
+
+    nrg_est1 = MultipleScattering(trk1);
+    //nrg_est1 = EnergyEst3D(trk1);
 
     if (nrg_est1> 50000.) nrg_est1=50000.;
     if ((nrg_est1/en)<1/3){
@@ -717,7 +906,6 @@ tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t
   stop=false;
   en = start_nrg_fit;
   Int_t loop2=0;
-  mdebug<<"Second track: "<<endl;
 
   while(!stop){
 
@@ -731,8 +919,8 @@ tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t
     nrg_est2=0;
 
     //Energy Estimation
-    //nrg_est2 = MultipleScattering(trk2);
-    nrg_est2 = EnergyEst3D(trk2);
+    nrg_est2 = MultipleScattering(trk2);
+    //nrg_est2 = EnergyEst3D(trk2);
 
     if (nrg_est2> 50000.) nrg_est2=50000.;
     if ((nrg_est2/en)<1/3){
@@ -758,23 +946,42 @@ Float_t MERTrackKalman3D::MultipleScattering(vector < TMatrix > trk)
   TVector3 vi0(1,0,0);
   TVector3 vi1(1,0,0);
 
-  Float_t E = 0;
+  Float_t var = 0;
+  Float_t sum = 0;
+  vector < Float_t > E;
 
-  for (Int_t i = 0; i < n-1; i++) {
-    if(trk[i](3,0) == 0) vi0.SetTheta(0.);
-    else vi0.SetTheta(atan(trk[i](3,0)/sin(atan2(trk[i](3,0),trk[i](1,0)))));
+  for (Int_t i = 0; i < n; i++) {
 
+    vi0.SetTheta(acos(1/(pow(trk[i](3,0),2)+pow(trk[i](1,0),2)+1)));
     vi0.SetPhi(atan2(trk[i](3,0),trk[i](1,0)));
 
     if (i != 0) {
       Float_t angle = vi0.Angle(vi1);
-      E = (13.6/angle)*sqrt(m_heightX0/cos(vi0.Theta()))*(1+0.038*log(m_heightX0/cos(vi0.Theta())));
+      Float_t Ei = (13.6/angle)*sqrt(m_heightX0/cos(vi0.Theta()))*(1+0.038*log(m_heightX0/cos(vi0.Theta())));
+      if (isfinite(Ei)){
+        E.push_back(Ei);
+      } else{
+        E.push_back(1e+6);
+      }
       //break;
     }
     vi1=vi0;
   }
 
-  return E;
+  sort(E.begin(), E.end());
+  E.pop_back();
+  E.erase(E.begin());
+
+  Float_t average = accumulate( E.begin(), E.end(), 0.0)/E.size();
+
+  for ( uint j =0; j < E.size(); j++) {
+    Float_t temp = pow((E[j] - average),2);
+    sum += temp;
+  }
+
+  var = sqrt(sum /E.size());
+
+  return E[lower_bound (E.begin(), E.end(), average-var)- E.begin()];
 }
 
 Float_t MERTrackKalman3D::MultipleScattering3D(vector < TMatrix > trk, Double_t e0)
@@ -808,10 +1015,8 @@ Float_t MERTrackKalman3D::MultipleScattering3D(vector < TMatrix > trk, Double_t 
 
   for (Int_t i = 0; i < n-1; i++) {
     thickness.push_back(m_heightX0/cos(theta[i]));
-    if ((e0 - (i + 1) * epsilon * cos(theta[i])) > 1)
-    en.push_back(e0 - (i + 1) * epsilon * cos( theta[i]));
-    else
-    en.push_back(1);
+    if ((e0 - (i + 1) * epsilon * cos(theta[i])) > 1) en.push_back(e0 - (i + 1) * epsilon * cos( theta[i]));
+    else en.push_back(1);
   }
 
   for (Int_t i = 0; i < n - 1; i++) {
@@ -950,8 +1155,10 @@ void MERTrackKalman3D::TrackPairs(MRERawEvent* RE)
   mdebug<<"Energy of the two particles: "<<E1<<" "<<E2<<endl;
   mdebug<<"Reconstructed theta, phi and energy of the gamma: "<<c_Deg*direction.Theta()<<" "<<c_Deg*direction.Phi()<<" "<<Egamma<<endl;
 
+
   MVector origin(0.5, 0., -0.866025);
-  //cout<<"Event "<<RE->GetEventID()<<" "<<c_Deg*origin.Angle(direction)<<endl;
+  mdebug<<"Event "<<RE->GetEventID()<<endl;
+  //" ERROR wrt 30 "<<c_Deg*origin.Angle(direction)<<endl;
 
   RE->SetElectronTrack(Electron);
   RE->SetPositronTrack(Positron);

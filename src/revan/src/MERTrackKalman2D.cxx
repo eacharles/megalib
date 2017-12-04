@@ -76,12 +76,9 @@ MERTrackKalman2D::MERTrackKalman2D() : MERTrack()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
-  double SigmaHitPos,
-  unsigned int NLayersForVertexSearch)
+bool MERTrackKalman2D::SetSpecialParameters(double SigmaHitPos, unsigned int NLayersForVertexSearch)
   {
     m_NLayersForVertexSearch = NLayersForVertexSearch;
-    m_heightX0 = HeightX0;
     m_sigma = SigmaHitPos;
 
     if (m_NLayersForVertexSearch < 4) {
@@ -163,7 +160,6 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
 
     Float_t _planedistance = 0.;
     Float_t m = 1000.;
-    Float_t height = m_heightX0*9.37;
 
     TMatrix C(2,2);
     TMatrix C_proj(2,2);
@@ -178,6 +174,9 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
     Float_t chi2 = 0.;
     MRESE vertex = RE->GetVertex();
     Chosen.AddRESE(RE->GetVertex());
+
+    Float_t height = 2*vertex.GetVolumeSequence()->GetDetector()->GetStructuralSize().GetZ();
+    m_heightX0 = height/vertex.GetVolumeSequence()->GetDetector()->GetSensitiveVolume(0)->GetMaterial()->GetRadiationLength();
 
     //Filtering
     Float_t t; // tan of the RMS of the scattering angle
@@ -231,6 +230,7 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
 
     Float_t PlaneZ = vertex.GetPosition().Z();
     mdebug<<"Vertex : "<<vertex.GetPosition().X()<<" "<<vertex.GetPosition().Y()<<" "<<vertex.GetPosition().Z()<<endl;
+    Float_t LayerDistance = vertex.GetVolumeSequence()->GetDetector()->GetStructuralPitch().GetZ();
 
     for (int r = 0; r < List.GetNRESEs() && i<n-1; r++) {
 
@@ -242,7 +242,7 @@ bool MERTrackKalman2D::SetSpecialParameters(double HeightX0,
         _planedistance = List.GetRESEAt(k)->GetPosition().Z()-PlaneZ;
       }
 
-      if(_planedistance>1.5) break; // we accept only hits on subsequent planes
+      if(_planedistance>1.5*LayerDistance) break; // we accept only hits on subsequent planes
 
       t=(13.6/en)*sqrt(m_heightX0)*(1+0.038*log(m_heightX0));
 

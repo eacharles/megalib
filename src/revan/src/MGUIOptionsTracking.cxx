@@ -160,12 +160,6 @@ void MGUIOptionsTracking::Create()
                                       m_Data->GetNLayersForVertexSearch(), true, 4);
     AddFrame(m_NLayersForVertexSearch, SubOptions);
 
-    m_HeightX0 = new MGUIEEntry(this,
-                                  "Radiation length of the tracker plane (used by the Kalman filter) [X0]:",
-                                  false,
-                                  m_Data->GetHeightX0(), true, 0.005336179);
-    AddFrame(m_HeightX0, SubOptions);
-
     m_SigmaHitPos = new MGUIEEntry(this,
                                   "Error in the position of the hit in the tracker (used by the Kalman filter) [cm]:",
                                   false,
@@ -248,7 +242,6 @@ bool MGUIOptionsTracking::OnApply()
     m_Data->SetMaxComptonJump(m_MaxComptonJump->GetAsInt());
     m_Data->SetNTrackSequencesToKeep(m_NSequencesToKeep->GetAsInt());
     m_Data->SetNLayersForVertexSearch(m_NLayersForVertexSearch->GetAsInt());
-    m_Data->SetHeightX0(m_HeightX0->GetAsDouble());
     m_Data->SetSigmaHitPos(m_SigmaHitPos->GetAsDouble());
     if (m_RejectPurelyAmbiguousSequences->GetState() == kButtonDown) {
       m_Data->SetRejectPurelyAmbiguousTrackSequences(true);

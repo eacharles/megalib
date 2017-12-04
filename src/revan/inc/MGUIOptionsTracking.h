@@ -67,7 +67,6 @@ class MGUIOptionsTracking : public MGUIDialog
   TGCheckButton* m_RejectPurelyAmbiguousSequences;
   MGUIEFileSelector* m_FileSelector;
   MGUIEEntry* m_NLayersForVertexSearch;
-  MGUIEEntry* m_HeightX0;
   MGUIEEntry* m_SigmaHitPos;
 
   TGListBox* m_DetectorList;

@@ -68,24 +68,24 @@ bool MREHit::ParseLine(MString HitString, int Version)
   // m_IsValid = false
 
   Reset();
-  
+
   // Handle the most common MEGAlib 2.x sim / evta file versions
   if (Version == 25 && HitString.BeginsWith("HTsim ")) {
     Version = 101;
   } else if (Version == 21 && HitString.BeginsWith("HT ")) {
     Version = 200;
-  }
-  
+  } else if (Version == -1 && !HitString.BeginsWith("HTsim ")) Version = 4;
+
   m_IsValid = true;
   m_FixedResolutions = false;
 
 
   if (Version == 100) {
-    if (sscanf(HitString, "HTsim %d;%lf;%lf;%lf;%lf\n", 
-               &m_Detector, 
-               &m_Position[0], 
-               &m_Position[1], 
-               &m_Position[2], 
+    if (sscanf(HitString, "HTsim %d;%lf;%lf;%lf;%lf\n",
+               &m_Detector,
+               &m_Position[0],
+               &m_Position[1],
+               &m_Position[2],
                &m_Energy) == 5) {
       m_Time = 0;
       m_PositionResolution.SetXYZ(0.0, 0.0, 0.0);
@@ -94,28 +94,28 @@ bool MREHit::ParseLine(MString HitString, int Version)
       m_IsValid = true;
     }
   } else if (Version == 101) {
-    if (sscanf(HitString, "HTsim %d;%lf;%lf;%lf;%lf;%lf\n", 
-               &m_Detector, 
-               &m_Position[0], 
-               &m_Position[1], 
-               &m_Position[2], 
-               &m_Energy, 
+    if (sscanf(HitString, "HTsim %d;%lf;%lf;%lf;%lf;%lf\n",
+               &m_Detector,
+               &m_Position[0],
+               &m_Position[1],
+               &m_Position[2],
+               &m_Energy,
                &m_Time) == 6) {
       m_PositionResolution.SetXYZ(0.0, 0.0, 0.0);
       m_EnergyResolution = 0.0;
       m_TimeResolution = 0.0;
       m_IsValid = true;
-    }    
+    }
   } else if (Version == 200) {
     if (sscanf(HitString, "HT %d;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf\n",
                &m_Detector,
-               &m_Position[0], 
-               &m_Position[1], 
-               &m_Position[2], 
-               &m_Energy, 
-               &m_PositionResolution[0], 
-               &m_PositionResolution[1], 
-               &m_PositionResolution[2], 
+               &m_Position[0],
+               &m_Position[1],
+               &m_Position[2],
+               &m_Energy,
+               &m_PositionResolution[0],
+               &m_PositionResolution[1],
+               &m_PositionResolution[2],
                &m_EnergyResolution) == 9) {
       m_Time = 0;
       m_TimeResolution = 0;
@@ -125,25 +125,53 @@ bool MREHit::ParseLine(MString HitString, int Version)
   } else if (Version == 201) {
     if (sscanf(HitString, "HT %d;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf\n",
                &m_Detector,
-               &m_Position[0], 
-               &m_Position[1], 
-               &m_Position[2], 
+               &m_Position[0],
+               &m_Position[1],
+               &m_Position[2],
                &m_Energy,
                &m_Time,
-               &m_PositionResolution[0], 
-               &m_PositionResolution[1], 
-               &m_PositionResolution[2], 
+               &m_PositionResolution[0],
+               &m_PositionResolution[1],
+               &m_PositionResolution[2],
                &m_EnergyResolution,
                &m_TimeResolution
               ) == 11) {
       m_IsValid = true;
       m_FixedResolutions = true;
     }
+  } else if (Version == 4) { // MEGA Duke evta file:
+    MTokenizer T(HitString, ';', false);
+    if (T.GetNTokens() == 10) {
+      sscanf(T.GetTokenAt(0), "HT%*4s%d", &m_Detector);
+      m_Position.SetXYZ(T.GetTokenAtAsDouble(1),
+                        T.GetTokenAtAsDouble(2),
+                        T.GetTokenAtAsDouble(3));
+      m_PositionResolution.SetXYZ(T.GetTokenAtAsDouble(6),
+                                  T.GetTokenAtAsDouble(7),
+                                  T.GetTokenAtAsDouble(8));
+      m_Energy = T.GetTokenAtAsDouble(4);
+      m_EnergyResolution = T.GetTokenAtAsDouble(9);
+      m_IsValid = true;
+      if (T.GetTokenAt(5) != "OK") {
+        if (T.GetTokenAt(5).Contains("OF") == true) {
+          m_IsValid = false;
+        } else if (T.GetTokenAt(5).Contains("BA") == true ||
+                   T.GetTokenAt(5).Contains("XO") == true ||
+                   T.GetTokenAt(5).Contains("YO") == true) {
+          m_IsValid = false;
+        }
+      }
+    } else {
+      m_IsValid = false;
+      m_SubElementType = MRESE::c_Unknown;
+      merr<<"Unable to read HT:"<<endl
+          <<HitString<<endl;
+    }
   } else {
     merr<<"Unknown version of sim/evta file (Version from file: "<<Version<<"), please upgrade (or use old version of MEGAlib prior to 3.0)"<<endl;
     return false;
   }
-  
+
   return m_IsValid;
 }
 
@@ -158,7 +186,7 @@ MREHit::MREHit(MREHit *Hit) : MRESE((MRESE *) Hit)
   m_IsValid = Hit->m_IsValid;
   m_SubElementType = MRESE::c_Hit;
   m_FixedResolutions = Hit->m_FixedResolutions;
-} 
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -166,7 +194,7 @@ MREHit::MREHit(MREHit *Hit) : MRESE((MRESE *) Hit)
 
 MREHit::~MREHit()
 {
-  // Delete this object, but do not delete its links and RESEs 
+  // Delete this object, but do not delete its links and RESEs
 }
 
 
@@ -246,14 +274,14 @@ MString MREHit::ToString(bool WithLink, int Level)
 //   for (int i = 0; i < Level; i++) {
 //     String += MString("   ");
 //   }
-//   sprintf(Text, "P: (%.3lf, %.3lf, %.3lf), E: %.3lf\n", 
+//   sprintf(Text, "P: (%.3lf, %.3lf, %.3lf), E: %.3lf\n",
 //          m_Position.X(), m_Position.Y(), m_Position.Z(), m_Energy);
 //   String += MString(Text);
 
   MString String("");
-  sprintf(Text, "Hit (%d) at (%.3f, %.3f, %.3f)+-(%.3f, %.3f, %.3f) with %.2f+-%.2f keV in detector %d\n", 
-          m_ID, m_Position.X(), m_Position.Y(), m_Position.Z(), 
-          m_PositionResolution.X(), m_PositionResolution.Y(), m_PositionResolution.Z(), 
+  sprintf(Text, "Hit (%d) at (%.3f, %.3f, %.3f)+-(%.3f, %.3f, %.3f) with %.2f+-%.2f keV in detector %d\n",
+          m_ID, m_Position.X(), m_Position.Y(), m_Position.Z(),
+          m_PositionResolution.X(), m_PositionResolution.Y(), m_PositionResolution.Z(),
           m_Energy, m_EnergyResolution, m_Detector);
   for (int i = 0; i < Level; i++) {
     String += MString("   ");
@@ -264,7 +292,7 @@ MString MREHit::ToString(bool WithLink, int Level)
     for (int i = 0; i < Level+1; i++) {
       String += MString("   ");
     }
-    String += MString("Linked with: ");   
+    String += MString("Linked with: ");
     for (int a = 0; a < GetNLinks(); a++) {
       sprintf(Text, "  (%d)", GetLinkAt(a)->GetID());
       String += MString(Text);
@@ -280,7 +308,7 @@ MString MREHit::ToString(bool WithLink, int Level)
 
 
 MString MREHit::ToEvtaString(const int ScientificPrecision, const int Version)
-{  
+{
   //! Convert to a string in the evta file
 
   ostringstream S;
@@ -346,13 +374,13 @@ MREHit* MREHit::Duplicate()
 bool MREHit::UpdateVolumeSequence(MDGeometryQuest* Geometry)
 {
   /* This optimization is for another day...
-  if (m_VolumeSequence != nullptr && 
+  if (m_VolumeSequence != nullptr &&
       m_VolumeSequence->GetNVolumes() > 0 &&
       m_VolumeSequence->GetPosition(0) == m_Position) {
-    return true; 
+    return true;
   }
   */
-  
+
   MDVolumeSequence* V = Geometry->GetVolumeSequencePointer(m_Position, true, true);
 
   // Check if we do have a resonable volume sequence:
@@ -364,7 +392,7 @@ bool MREHit::UpdateVolumeSequence(MDGeometryQuest* Geometry)
     delete m_VolumeSequence;
     m_VolumeSequence = V;
   }
-  
+
   return true;
 }
 
@@ -376,15 +404,15 @@ bool MREHit::RetrieveResolutions(MDGeometryQuest* Geometry)
 {
   // Do not do anything if we have fixed resolutions
   if (m_FixedResolutions == true) return true;
-  
+
   if (UpdateVolumeSequence(Geometry) == false) return false;
-  
+
   Geometry->GetResolutions(m_Position, m_Energy, m_Time, *m_VolumeSequence, m_PositionResolution, m_EnergyResolution, m_TimeResolution);
-  
+
   return true;
 }
-  
-  
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -399,7 +427,7 @@ bool MREHit::Noise(MDGeometryQuest* Geometry)
   }
   //cout<<"Pos after: "<<m_Position[0]<<"!"<<m_Position[1]<<"!"<<m_Position[2]<<endl;
 
-  if (m_Detector < MDDetector::c_MinDetector || 
+  if (m_Detector < MDDetector::c_MinDetector ||
       m_Detector > MDDetector::c_MaxDetector) {
     merr<<"Unknown detector ID: "<<m_Detector<<show;
     return false;

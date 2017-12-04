@@ -186,7 +186,6 @@ MRawEventAnalyzer::MRawEventAnalyzer()
   m_NTrackSequencesToKeep = 1;
   m_RejectPurelyAmbiguousTrackSequences = false;
   m_NLayersForVertexSearch = 4;
-  m_HeightX0 = 0.005336179;
   m_SigmaHitPos = 0.00693;
 
   m_AssumeD1First = false;
@@ -329,7 +328,6 @@ void MRawEventAnalyzer::SetSettings(MSettingsEventReconstruction* S)
   SetElectronTrackingDetectorList(S->GetElectronTrackingDetectors());
 
   // Kalman Filter
-  SetHeightX0(S->GetHeightX0());
   SetSigmaHitPos(S->GetSigmaHitPos());
 
   // compton tracking:
@@ -1248,10 +1246,10 @@ bool MRawEventAnalyzer::PreAnalysis()
     // Pair Algorithm
     if (m_PairAlgorithm == c_PairKalman3D) {
       m_Tracker = new MERTrackKalman3D();
-      dynamic_cast<MERTrackKalman3D*>(m_Tracker)->SetSpecialParameters(m_HeightX0, m_SigmaHitPos, m_NLayersForVertexSearch);
+      dynamic_cast<MERTrackKalman3D*>(m_Tracker)->SetSpecialParameters(m_SigmaHitPos, m_NLayersForVertexSearch);
     } else if (m_PairAlgorithm == c_PairKalman2D) {
       m_Tracker = new MERTrackKalman2D();
-      dynamic_cast<MERTrackKalman2D*>(m_Tracker)->SetSpecialParameters(m_HeightX0, m_SigmaHitPos, m_NLayersForVertexSearch);
+      dynamic_cast<MERTrackKalman2D*>(m_Tracker)->SetSpecialParameters(m_SigmaHitPos, m_NLayersForVertexSearch);
     }else if (m_PairAlgorithm == c_PairDefault) {
       m_Tracker = new MERTrack();
     } else {

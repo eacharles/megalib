@@ -239,7 +239,6 @@ class MRawEventAnalyzer
   void SetElectronTrackingDetectorList(vector<MString> DetectorList) { m_ElectronTrackingDetectorList = DetectorList; }
 
   // Options Kalman Filter
-  void SetHeightX0(double HeightX0) { m_HeightX0 = HeightX0; }
   void SetSigmaHitPos(double SigmaHitPos) { m_SigmaHitPos = SigmaHitPos; }
 
   // Option Compton tracking:
@@ -400,7 +399,6 @@ class MRawEventAnalyzer
   vector<MString> m_ElectronTrackingDetectorList;
 
   //Kalman Filter:
-  double m_HeightX0;
   double m_SigmaHitPos;
 
   // Compton tracking:
@@ -421,7 +419,7 @@ class MRawEventAnalyzer
 
   MString m_TMVAFileName;
   MERCSRTMVAMethods m_TMVAMethods;
-  
+
   MVector m_LensCenter;
   MVector m_FocalSpotCenter;
 

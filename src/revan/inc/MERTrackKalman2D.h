@@ -39,9 +39,7 @@ class MERTrackKalman2D : public MERTrack
 
   //! Set all special parameters - this function should not rely on a previous
   //! call to SetParameters()
-  virtual bool SetSpecialParameters(double HeightX0,
-                               double SigmaHitPos,
-                               unsigned int NLayersForVertexSearch);
+  virtual bool SetSpecialParameters(double SigmaHitPos, unsigned int NLayersForVertexSearch);
 
   virtual MString ToString(bool CoreOnly = false) const;
 

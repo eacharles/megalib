@@ -39,9 +39,7 @@ class MERTrackKalman3D : public MERTrack
 
   //! Set all special parameters - this function should not rely on a previous
   //! call to SetParameters()
-  virtual bool SetSpecialParameters(double HeightX0,
-                               double SigmaHitPos,
-                               unsigned int NLayersForVertexSearch);
+  virtual bool SetSpecialParameters(double SigmaHitPos, unsigned int NLayersForVertexSearch);
 
   virtual MString ToString(bool CoreOnly = false) const;
 
@@ -53,7 +51,9 @@ class MERTrackKalman3D : public MERTrack
   tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t, MRESEList, MRESEList> SearchTracks(MRERawEvent* RE);
   Float_t MultipleScattering(vector < TMatrix > trk);
   void TrackPairs(MRERawEvent* RE);
-  //MRawEventList* CheckForPair(MRERawEvent* RE);
+  MRawEventList* CheckForPair(MRERawEvent* RE);
+
+  //These functions are not used, they are kept for record-keeping
   Float_t EnergyEst3D(vector < TMatrix > trk);
   Float_t MultipleScattering3D(vector < TMatrix > trk, Double_t e0);
 
