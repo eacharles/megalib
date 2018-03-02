@@ -460,6 +460,10 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
         Typo("Line must contain three entries, e.g. \"Constant Distance 10.5\"");
         return false;
       }
+      if (Tokenizer.GetTokenAt(1) == Tokenizer.GetTokenAt(2)) {
+        Typo("The constant name and replacement are identical!");
+        return false;        
+      }
       vector<MString>::iterator VIter = find(m_BlockedConstants.begin(), m_BlockedConstants.end(), Tokenizer.GetTokenAt(1));
       if (VIter != m_BlockedConstants.end()) {
         Typo("Constant has a reserved name, and thus cannot be used!");
@@ -508,13 +512,9 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
     // Step 2: Replace constants in constants
     bool ConstantChangableWithMath = false;
     ConstantChanged = false;
-    for (map<MString, MString>::iterator Iter1 = m_ConstantMap.begin();
-         Iter1 != m_ConstantMap.end();
-         ++Iter1) {
-      //cout<<(*Iter1).first<<" - "<<(*Iter1).second<<" Pos: "<<i++<<" of "<<m_ConstantMap.size()<<endl;
-      for (map<MString, MString>::iterator Iter2 = m_ConstantMap.begin();
-           Iter2 != m_ConstantMap.end();
-           ++Iter2) {
+    for (map<MString, MString>::iterator Iter1 = m_ConstantMap.begin(); Iter1 != m_ConstantMap.end(); ++Iter1) {
+      //cout<<"Checking for replacement: "<<(*Iter1).first<<" with "<<(*Iter1).second<<endl;
+      for (map<MString, MString>::iterator Iter2 = m_ConstantMap.begin(); Iter2 != m_ConstantMap.end(); ++Iter2) {
         //cout<<"Map size: "<<m_ConstantMap.size()<<endl;
         if (ContainsReplacableConstant((*Iter1).second, (*Iter2).first) == true) {
           //cout<<"   ---> "<<(*Iter2).first<<" - "<<(*Iter2).second<<endl;
@@ -1479,7 +1479,7 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
     if (Tokenizer.IsTokenAt(1, "Copy") == true) {
       if ((V = GetVolume(Tokenizer.GetTokenAt(0))) != 0) {
         if (GetVolume(Tokenizer.GetTokenAt(2)) != 0) {
-          Typo("A volume of this name already exists!");
+          Typo("Copy: A volume of this name already exists!");
           return false;
         }
         if (V->IsClone() == true) {
@@ -2240,7 +2240,7 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
           m_WorldVolume = V;
         } else {
           if (GetVolume(Tokenizer.GetTokenAt(2)) == 0) {
-            Typo("A volume of this name does not exist!");
+            Typo("Mother: A volume of this name does not exist!");
             return false;
           }
           if (GetVolume(Tokenizer.GetTokenAt(2)) == V) {
@@ -2432,7 +2432,7 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
         }
         // Test if volume exists:
         if ((V = GetVolume(Tokenizer.GetTokenAt(2))) == 0) {
-          Typo("A volume of this name does not exist!");
+          Typo("SensitiveVolume: A volume of this name does not exist!");
           return false;
         }
         D->AddSensitiveVolume(V);
@@ -2446,7 +2446,7 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
         }
         // Test if volume exists:
         if ((V = GetVolume(Tokenizer.GetTokenAt(2))) == 0) {
-          Typo("A volume of this name does not exist!");
+          Typo("DetectorVolume: A volume of this name does not exist!");
           return false;
         }
         D->SetDetectorVolume(V);

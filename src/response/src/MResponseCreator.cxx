@@ -55,6 +55,8 @@ using namespace std;
 #include "MResponseEarthHorizon.h"
 #include "MResponseTracking.h"
 #include "MResponseEventQuality.h"
+#include "MResponseEventQualityTMVAEventFile.h"
+#include "MResponseStripPairingTMVAEventFile.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,9 +148,11 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
   Usage<<MResponseSpectral::Options()<<endl;
   Usage<<"      cd : clustering for double sided-strip detectors"<<endl;
   Usage<<"      t  : track"<<endl;
-  Usage<<"      cf : root good/bad event files for TMVA methods"<<endl;
+  Usage<<"      cf : "<<MResponseMultipleComptonEventFile::Description()<<endl;
+  Usage<<MResponseMultipleComptonEventFile::Options()<<endl;
   Usage<<"      cb : compton (Bayesian)"<<endl;
-  Usage<<"      ct : compton (TMVA)"<<endl;
+  Usage<<"      ct : "<<MResponseMultipleComptonTMVA::Description()<<endl;
+  Usage<<MResponseMultipleComptonTMVA::Options()<<endl;
   Usage<<"      cn : compton (NeuralNetwork)"<<endl;
   Usage<<"      cl : compton (Laue lens or collimated)"<<endl;
   Usage<<"      a  : ARM"<<endl;
@@ -161,13 +165,15 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
   Usage<<"      e  : earth horizon"<<endl;
   Usage<<"      f  : first interaction position"<<endl;
   Usage<<"      q  : event quality"<<endl;
+  Usage<<"      qf : "<<MResponseEventQualityTMVAEventFile::Description()<<endl;
+  Usage<<MResponseEventQualityTMVAEventFile::Options()<<endl;
+  Usage<<"      sf : "<<MResponseStripPairingTMVAEventFile::Description()<<endl;
+  Usage<<MResponseStripPairingTMVAEventFile::Options()<<endl;
   Usage<<endl;  
   Usage<<"    Special options:"<<endl;
   Usage<<"      For Compton modes (cf, cb, ct, cn, cl): "<<endl;
   Usage<<"          --no-absorptions           don't calculate absoption probabilities - excludes all data sets with use absorption probabilities"<<endl;
   Usage<<"          --max-interactions         maximum number of interactions to look at (don't go beyond 6-7)"<<endl;
-  Usage<<"      For TMVA Compton mode (ct): "<<endl;
-  Usage<<"          --tmva-methods             comma-separated list (no spaces) of TMVA methods to use: BDTD (*), MLP (*), DNN_GPU, DNN_CPU"<<endl;
   Usage<<endl;
   
   string Option, SubOption, ResponseOptions;
@@ -285,6 +291,12 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
       } else if (SubOption == "q") {
         m_Mode = c_ModeEventQuality;
         cout<<"Choosing Event Quality mode"<<endl;
+      } else if (SubOption == "qf") {
+        m_Mode = c_ModeEventQualityTMVAEventFile;
+        cout<<"Choosing Event Quality mode (create event files)"<<endl;
+      } else if (SubOption == "sf") {
+        m_Mode = c_ModeStripPairingTMVAEventFile;
+        cout<<"Choosing Strip Pairing mode (create event files)"<<endl;
       } else {
         cout<<"Error: Unknown suboption \""<<SubOption<<"\"!"<<endl;
         cout<<Usage.str()<<endl;
@@ -305,9 +317,6 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
       m_MaxNInteractions = atoi(argv[++i]);
       if (m_MaxNInteractions < 2) m_MaxNInteractions = 2;
       cout<<"Maximum number of interactions: "<<m_MaxNInteractions<<endl;
-    } else if (Option == "--tmva-methods") {
-      m_TMVAMethodsString = argv[++i];
-      cout<<"TMVA methods to use "<<m_TMVAMethodsString<<endl;
     } else if (Option == "-d") {
       if (g_Verbosity < 2) g_Verbosity = c_Chatty;
       cout<<"Enabling debug!"<<endl;
@@ -412,6 +421,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanSettingsFileName(m_RevanCfgFileName);
     Response.SetDoAbsorptions(!m_NoAbsorptions);
     
+    if (Response.ParseOptions(ResponseOptions) == false) return false;
     if (Response.Initialize() == false) return false;
     while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
@@ -434,6 +444,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     //Response.SetRevanSettingsFileName(m_RevanCfgFileName);
     //Response.SetDoAbsorptions(!m_NoAbsorptions);
     
+    if (Response.ParseOptions(ResponseOptions) == false) return false;
     if (Response.Initialize() == false) return false;
     while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
@@ -609,7 +620,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
 
-} else if (m_Mode == c_ModeEventQuality) {
+  } else if (m_Mode == c_ModeEventQuality) {
 
     if (m_MimrecCfgFileName == g_StringNotDefined) {
       cout<<"Error: No mimrec configuration file name given!"<<endl;
@@ -632,7 +643,59 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     if (Response.Initialize() == false) return false;
     while (Response.Analyze() == true && m_Interrupt == false);
     if (Response.Finalize() == false) return false;
-
+    
+  } else if (m_Mode == c_ModeEventQualityTMVAEventFile) {
+    
+    if (m_RevanCfgFileName == g_StringNotDefined) {
+      cout<<"Error: No revan configuration file name given!"<<endl;
+      cout<<Usage.str()<<endl;
+      return false;
+    }
+    
+    MResponseEventQualityTMVAEventFile Response;
+    
+    Response.SetDataFileName(m_FileName);
+    Response.SetGeometryFileName(m_GeometryFileName);
+    Response.SetResponseName(m_ResponseName);
+    Response.SetCompression(m_Compress);
+    
+    Response.SetMaxNInteractions(m_MaxNInteractions);
+    Response.SetMaxNumberOfEvents(m_MaxNEvents);
+    Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
+    
+    Response.SetRevanSettingsFileName(m_RevanCfgFileName);
+    Response.SetDoAbsorptions(!m_NoAbsorptions);
+    
+    if (Response.ParseOptions(ResponseOptions) == false) return false;
+    if (Response.Initialize() == false) return false;
+    while (Response.Analyze() == true && m_Interrupt == false);
+    if (Response.Finalize() == false) return false;
+    
+  } else if (m_Mode == c_ModeStripPairingTMVAEventFile) {
+    
+    if (m_RevanCfgFileName == g_StringNotDefined) {
+      cout<<"Error: No revan configuration file name given!"<<endl;
+      cout<<Usage.str()<<endl;
+      return false;
+    }
+    
+    MResponseStripPairingTMVAEventFile Response;
+    
+    Response.SetDataFileName(m_FileName);
+    Response.SetGeometryFileName(m_GeometryFileName);
+    Response.SetResponseName(m_ResponseName);
+    Response.SetCompression(m_Compress);
+    
+    Response.SetMaxNumberOfEvents(m_MaxNEvents);
+    Response.SetSaveAfterNumberOfEvents(m_SaveAfter);
+    
+    Response.SetRevanSettingsFileName(m_RevanCfgFileName);
+    
+    if (Response.ParseOptions(ResponseOptions) == false) return false;
+    if (Response.Initialize() == false) return false;
+    while (Response.Analyze() == true && m_Interrupt == false);
+    if (Response.Finalize() == false) return false;
+    
   } else if (m_Mode == c_ModeImagingListMode) {
 
     if (m_MimrecCfgFileName == g_StringNotDefined) {
@@ -655,6 +718,7 @@ bool MResponseCreator::ParseCommandLine(int argc, char** argv)
     Response.SetRevanConfigurationFileName(m_RevanCfgFileName);
 
     Response.CreateResponse();
+    
   } else if (m_Mode == c_ModeFirstInteractionPosition) {
 
     if (m_MimrecCfgFileName == g_StringNotDefined) {

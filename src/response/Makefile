@@ -12,11 +12,11 @@
 # Definitions:
 #
 
-PRGM	= $(BN)/responsemanipulator
+PRGM  = $(BN)/responsemanipulator
 
-MOBJM	=	$(LB)/MResponseManipulatorMain.o
+MOBJM = $(LB)/MResponseManipulatorMain.o
 
-PRGC	= $(BN)/responsecreator
+PRGC  = $(BN)/responsecreator
 
 MOBJC = $(LB)/MResponseCreatorMain.o
 
@@ -41,6 +41,8 @@ LOBJS = $(LB)/MResponseCreator.o \
 	$(LB)/MResponseImagingCodedMask.o \
 	$(LB)/MResponseEarthHorizon.o \
 	$(LB)/MResponseEventQuality.o \
+	$(LB)/MResponseEventQualityTMVAEventFile.o \
+	$(LB)/MResponseStripPairingTMVAEventFile.o \
 
 
 OBJS = $(MOBJM) $(MOBJC) $(LOBJS)

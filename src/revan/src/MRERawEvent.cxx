@@ -1002,6 +1002,18 @@ MPhysicalEvent* MRERawEvent::GetPhysicalEvent()
       
       CE->SetCoincidenceWindow(m_CoincidenceWindow);
 
+      // Add as hits:
+      MRESE* Start = m_Start;
+      CE->AddHit(Start->CreatePhysicalEventHit());
+      MRESE* Middle = Start->GetLinkAt(0);
+      CE->AddHit(Middle->CreatePhysicalEventHit());
+      while (Middle->GetNLinks() > 1) {
+        MRESE* End = Middle->GetOtherLink(Start);
+        CE->AddHit(End->CreatePhysicalEventHit());
+        Start = Middle;
+        Middle = End;
+      }
+      
       m_Event = (MPhysicalEvent*) CE;
     } else if (m_EventType == c_PairEvent) {
       // We need to have two tracks:
@@ -1731,8 +1743,8 @@ int MRERawEvent::ParseLine(const char* Line, int Version)
       m_IsValid = false;
     }
 
-    if (GetNRESEs() > 1000) {
-      mout<<"Hard coded hit limit of max. 1000 hits - no longer adding hits to event "<<m_EventID<<endl;
+    if (GetNRESEs() > 10000) {
+      mout<<"Hard coded hit limit of max. 10000 hits - no longer adding hits to event "<<m_EventID<<endl;
       m_IsValid = false;
       return 2;
     }

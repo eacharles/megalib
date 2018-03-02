@@ -24,6 +24,7 @@
 #include "MGlobal.h"
 #include "MResponseBuilder.h"
 #include "MResponseMatrixON.h"
+#include "MAtmosphericAbsorption.h"
 
 // Forward declarations:
 
@@ -72,14 +73,22 @@ class MResponseImagingBinnedMode : public MResponseBuilder
 
   // protected members:
  protected:
-  //! The bin width of the angles near the equator
+  //! The bin width of the angles near the equator for the gamma rays
   double m_AngleBinWidth;
+  //! The bin width of the angles near the equator for the recoil electron (360 for no electron tracking)
+  double m_AngleBinWidthElectron;
   //! Number of energy bins
   unsigned int m_EnergyNBins;
   //! Minimum energy range
   double m_EnergyMinimum;
   //! Maximum energy range
   double m_EnergyMaximum;
+  //! Number of distance bins
+  unsigned int m_DistanceNBins;
+  //! Minimum distance range
+  double m_DistanceMinimum;
+  //! Maximum energy range
+  double m_DistanceMaximum;
   
   //! The imaging response 
   MResponseMatrixON m_ImagingResponse;
@@ -88,7 +97,15 @@ class MResponseImagingBinnedMode : public MResponseBuilder
   //! The fine energy response (fine than the one in imaging)
   MResponseMatrixON m_EnergyResponse;
   
-
+  //! Use an absorption factor
+  bool m_UseAtmosphericAbsorption;
+  //! An atmospheric absorption factor
+  MAtmosphericAbsorption m_AtmosphericAbsorption;
+  //! The name of the atmospheric absorption data file
+  MString m_AtmosphericAbsorptionFileName;
+  //! The altitude used for the atmospheric absorption
+  double m_Altitude;
+    
   // private members:
  private:
 
