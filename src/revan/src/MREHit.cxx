@@ -154,7 +154,7 @@ bool MREHit::ParseLine(MString HitString, int Version)
       m_IsValid = true;
       if (T.GetTokenAt(5) != "OK") {
         if (T.GetTokenAt(5).Contains("OF") == true) {
-          m_IsValid = false;
+          m_IsValid = true;  //Take OverFlow because we're interested in Pairs
         } else if (T.GetTokenAt(5).Contains("BA") == true ||
                    T.GetTokenAt(5).Contains("XO") == true ||
                    T.GetTokenAt(5).Contains("YO") == true) {
@@ -170,7 +170,7 @@ bool MREHit::ParseLine(MString HitString, int Version)
   } else {
     merr<<"Unknown version of sim/evta file (Version from file: "<<Version<<"), please upgrade (or use old version of MEGAlib prior to 3.0)"<<endl;
     return false;
-  }
+    }
 
   return m_IsValid;
 }

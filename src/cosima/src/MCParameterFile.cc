@@ -609,7 +609,7 @@ bool MCParameterFile::Parse()
       if (T->IsTokenAt(1, "IsotopeProductionFile", true) == true) {
         if (T->GetNTokens() >= 3) {
           MString FileName = T->GetTokenAfterAsString(2);
-          MFile::ApplyPath(FileName, m_FileName);
+          //MFile::ApplyPath(FileName, m_FileName);
           if (MFile::Exists(FileName) == true) {
             if (Activator->AddCountsFile(FileName) == true) {
               mdebug<<"Setting isotope production file "<<FileName<<" for activator "
