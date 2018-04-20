@@ -596,7 +596,7 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
   m_InitialRawEvent = RE->Duplicate();
 
 
-  // Sets the initial event and cleans the remainders of the last event
+  // Set the initial event and clean the remainders of the last event
   m_RawEvents->SetInitialRawEvent(RE);
 
 
@@ -631,6 +631,8 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     SelectionsPassed = false;
   }
 
+  
+  
   // Analyze the event
   if (SelectionsPassed == true) {
 
