@@ -631,8 +631,8 @@ unsigned int MRawEventAnalyzer::AnalyzeEvent()
     SelectionsPassed = false;
   }
 
-  
-  
+
+
   // Analyze the event
   if (SelectionsPassed == true) {
 
