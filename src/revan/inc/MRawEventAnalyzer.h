@@ -113,7 +113,7 @@ class MRawEventAnalyzer
   //! The returns the best found event
   MRERawEvent* GetOptimumEvent();
   //! A best solution was not found - but we still have a best try
-  MRERawEvent* GetBestTryEvent();  
+  MRERawEvent* GetBestTryEvent();
   //! Return the initial raw event before all event reconstrcutions
 
   MRERawEvent* GetInitialRawEvent();

@@ -1,4 +1,4 @@
-/* 
+/*
  * BackgroundGenerator.cxx
  *
  *
@@ -49,7 +49,7 @@ public:
   BackgroundGenerator();
   //! Default destructor
   ~BackgroundGenerator();
-  
+
   //! Parse the command line
   bool ParseCommandLine(int argc, char** argv);
   //! Analyze what eveer needs to be analyzed...
@@ -68,10 +68,24 @@ protected:
   bool GenerateCosmicElectronsMizuno();
   //! Generate a cosmic positron spectrum according to Mizuno
   bool GenerateCosmicPositronsMizuno();
-  
+
+
+    //! Generate a cosmic proton spectrum from AMS data
+  bool GenerateCosmicProtonsAguilar();
+  //! Generate a cosmic alpha spectrum from AMS data
+  bool GenerateCosmicAlphasAguilar();
+  //! Generate a cosmic electron spectrum AMS data
+  bool GenerateCosmicElectronsAguilar();
+  //! Generate a cosmic positron spectrum AMS data
+  bool GenerateCosmicPositronsAguilar();
+  //! Generate a albedo photo spectrum according to SazonovChurazovMizunoAbdo
+  bool GenerateCosmicPhotonTurlerMizunoAckermann();
+  //! Generate a albedo photo spectrum according to SazonovChurazovMizunoAbdo
+  bool GenerateAlbedoPhotonsSazonovChurazovMizunoAbdo();
+
   //! Generate a trapped proton and electron spectrum from SPENVIS
   bool GenerateTrappedProtonsElectronsSpenvis();
-  
+
   //! Generate the albedo photons according to Ajello and Mizuno et al
   bool GenerateAlbedoPhotonsAjelloMizuno();
   //! Generate the albedo photons according to Tuerler, Mizuno & Abdo et al
@@ -92,8 +106,8 @@ protected:
   bool GenerateAlbedoNeutronsMorrisKole();
   //! Generate the albedo neutron spectrum according to Kole+ 2014
   bool GenerateAlbedoNeutronsKole();
-  
-  
+
+
   //!
   bool IsValid(double ModelMin, double ModelMax);
 
@@ -103,13 +117,16 @@ protected:
 
   //! Write the final summary files
   bool WriteSummaryFiles();
-  
+
 private:
   //! True, if the analysis needs to be interrupted
   bool m_Interrupt;
 
   //! True, if we are in MGGPOD mode
   bool m_IsMGGPOD;
+
+  //! True, if we want to use different models
+  bool m_PlanB;
 
   //! True if we are in orbit around Earth
   bool m_IsEarthOrbit;
@@ -142,28 +159,28 @@ private:
   unsigned int m_NAngleBins;
   //! The angle binning
   vector<double> m_AngleBins;
-  
+
   //! A trapped proton and electrons file from Spenvis
   MString m_AverageTrappedProtonsElectronsSpenvis;
-  
+
   //! A cosmic proton file from Spenvis
   MString m_AverageCosmicProtonsSpenvis;
-  
+
   //! A cosmic alphas file from Spenvis
   MString m_AverageCosmicAlphasSpenvis;
-  
+
   //! The photonic summary files
   vector<MString> m_PhotonicSummaryFiles;
-  
+
   //! The leptonic summary files
   vector<MString> m_LeptonicSummaryFiles;
-  
+
   //! The hadronic summary files
   vector<MString> m_HadronicSummaryFiles;
-  
+
   //! The trapped hadronic summary files
   vector<MString> m_TrappedHadronicSummaryFiles;
-  
+
 };
 
 /******************************************************************************/
@@ -177,7 +194,7 @@ BackgroundGenerator::BackgroundGenerator() : m_Interrupt(false)
   gStyle->SetPalette(1, 0);
 
   m_IsEarthOrbit = false;
-  m_Altitude = 575.0; // km 
+  m_Altitude = 575.0; // km
   m_Inclination = 6.0; // deg
 
   m_HorizonAngle = 0.0; // Calculated later
@@ -192,6 +209,8 @@ BackgroundGenerator::BackgroundGenerator() : m_Interrupt(false)
   m_NAngleBins = 100;
 
   m_IsMGGPOD = false;
+
+  m_PlanB = false;
 }
 
 
@@ -219,6 +238,7 @@ bool BackgroundGenerator::ParseCommandLine(int argc, char** argv)
   Usage<<"         -tps <file>:  A trapped proton file from SPENVIS"<<endl;
   Usage<<"         -cps <file>:  A cosmic proton file from SPENVIS"<<endl;
   Usage<<"         -cas <file>:  A cosmic alpha particle file from SPENVIS"<<endl;
+  Usage<<"         -pb: Generating background using a different model"<<endl;
   Usage<<"         -h:           print this help"<<endl;
   Usage<<endl;
 
@@ -240,25 +260,25 @@ bool BackgroundGenerator::ParseCommandLine(int argc, char** argv)
     // First check if each option has sufficient arguments:
     // Single argument
     if (Option == "-f" || Option == "-b" || Option == "-tps" || Option == "-cps" || Option == "-cas") {
-      if (!((argc > i+1) && 
+      if (!((argc > i+1) &&
             (argv[i+1][0] != '-' || isalpha(argv[i+1][1]) == 0))){
         cout<<"Error: Option "<<argv[i][1]<<" needs a second argument!"<<endl;
         cout<<Usage.str()<<endl;
         return false;
       }
-    } 
+    }
     // Multiple arguments template
     else if (Option == "-e") {
-      if (!((argc > i+2) && 
-            (argv[i+1][0] != '-' || isalpha(argv[i+1][1]) == 0) && 
+      if (!((argc > i+2) &&
+            (argv[i+1][0] != '-' || isalpha(argv[i+1][1]) == 0) &&
             (argv[i+2][0] != '-' || isalpha(argv[i+2][1]) == 0))){
         cout<<"Error: Option "<<argv[i][1]<<" needs two arguments!"<<endl;
         cout<<Usage.str()<<endl;
         return false;
       }
     } else if (Option == "-o") {
-      if (!((argc > i+3) && 
-            (argv[i+1][0] != '-' || isalpha(argv[i+1][1]) == 0) && 
+      if (!((argc > i+3) &&
+            (argv[i+1][0] != '-' || isalpha(argv[i+1][1]) == 0) &&
             (argv[i+2][0] != '-' || isalpha(argv[i+2][1]) == 0) &&
             (argv[i+3][0] != '-' || isalpha(argv[i+3][1]) == 0))) {
         cout<<"Error: Option "<<argv[i][1]<<" needs three arguments!"<<endl;
@@ -297,6 +317,15 @@ bool BackgroundGenerator::ParseCommandLine(int argc, char** argv)
     } else if (Option == "-m") {
       m_IsMGGPOD = true;
       cout<<"Generating MGGPOD output format"<<endl;
+    } else if (Option == "-pb") {
+      m_PlanB = true;
+      cout<<"Generating background using a different model for:"<<endl;
+      cout<<"* Primary Protons"<<endl;
+      cout<<"* Primary Alphas"<<endl;
+      cout<<"* Primary Electrons"<<endl;
+      cout<<"* Primary Positrons"<<endl;
+      cout<<"* Cosmic Photons"<<endl;
+      cout<<"* Albedo Photons"<<endl;
     } else {
       cout<<"Error: Unknown option \""<<Option<<"\"!"<<endl;
       cout<<Usage.str()<<endl;
@@ -320,7 +349,7 @@ bool BackgroundGenerator::Analyze()
   } else {
     m_HorizonAngle = 180.0;
   }
-  
+
   double Min = m_EnergyMin;
   if (Min <= 0) Min = 1;
   Min = log(Min);
@@ -330,39 +359,61 @@ bool BackgroundGenerator::Analyze()
     m_EnergyBins.push_back(exp(Min + i*Dist));
   }
   m_NEnergyBins = m_EnergyBins.size();
-  
+
   Min = 0;
   Max = 180;
   Dist = (Max-Min)/(m_NAngleBins);
   for (unsigned int i = 0; i <= m_NAngleBins; ++i) {
     m_AngleBins.push_back(Min + i*Dist);
-  }  
-  
-  if (GenerateCosmicPhotonGruber() == false) return false;
-  if (GenerateCosmicElectronsMizuno() == false) return false;
-  if (GenerateCosmicPositronsMizuno() == false) return false;
-  
-  
-  if (m_AverageCosmicProtonsSpenvis != "") {
-    if (GenerateCosmicProtonsSpenvis() == false) return false;    
   }
-  if (m_AverageCosmicAlphasSpenvis != "") {
-    if (GenerateCosmicAlphasSpenvis() == false) return false;    
+
+  if (m_PlanB == false){
+    if (GenerateCosmicPhotonGruber() == false) return false;
+    if (GenerateCosmicElectronsMizuno() == false) return false;
+    if (GenerateCosmicPositronsMizuno() == false) return false;
+
+
+    if (m_AverageCosmicProtonsSpenvis != "") {
+      if (GenerateCosmicProtonsSpenvis() == false) return false;
+    }
+    if (m_AverageCosmicAlphasSpenvis != "") {
+      if (GenerateCosmicAlphasSpenvis() == false) return false;
+    }
+    if (m_AverageTrappedProtonsElectronsSpenvis != "") {
+      if (GenerateTrappedProtonsElectronsSpenvis() == false) return false;
+    }
+
+    if (m_IsEarthOrbit == true) {
+      if (GenerateAlbedoPhotonsTuerlerMizunoAbdo() == false) return false;
+      if (GenerateAlbedoPhotonLinesHarris() == false) return false;
+      if (GenerateAlbedoElectronsAlcarazMizuno() == false) return false;
+      if (GenerateAlbedoPositronsAlcarazMizuno() == false) return false;
+      if (GenerateAlbedoProtonsAveragedMizuno() == false) return false;
+      if (GenerateAlbedoNeutronsKole() == false) return false;
+    }
+  } else {
+    if (GenerateCosmicPhotonTurlerMizunoAckermann() == false) return false;
+    if (GenerateCosmicElectronsAguilar() == false) return false;
+    if (GenerateCosmicPositronsAguilar() == false) return false;
+
+    if (GenerateCosmicProtonsAguilar() == false) return false;
+
+    if (GenerateCosmicAlphasAguilar() == false) return false;
+
+    if (m_AverageTrappedProtonsElectronsSpenvis != "") {
+      if (GenerateTrappedProtonsElectronsSpenvis() == false) return false;
+    }
+
+    if (m_IsEarthOrbit == true) {
+      if (GenerateAlbedoPhotonsSazonovChurazovMizunoAbdo() == false) return false;
+      if (GenerateAlbedoPhotonLinesHarris() == false) return false;
+      if (GenerateAlbedoElectronsAlcarazMizuno() == false) return false;
+      if (GenerateAlbedoPositronsAlcarazMizuno() == false) return false;
+      if (GenerateAlbedoProtonsAveragedMizuno() == false) return false;
+      if (GenerateAlbedoNeutronsKole() == false) return false;
+    }
   }
-  if (m_AverageTrappedProtonsElectronsSpenvis != "") {
-    if (GenerateTrappedProtonsElectronsSpenvis() == false) return false;    
-  }
-  
-  
-  if (m_IsEarthOrbit == true) {
-    if (GenerateAlbedoPhotonsTuerlerMizunoAbdo() == false) return false;
-    if (GenerateAlbedoPhotonLinesHarris() == false) return false;
-    if (GenerateAlbedoElectronsAlcarazMizuno() == false) return false;
-    if (GenerateAlbedoPositronsAlcarazMizuno() == false) return false;
-    if (GenerateAlbedoProtonsAveragedMizuno() == false) return false;
-    if (GenerateAlbedoNeutronsKole() == false) return false;
-  }
-  
+
   WriteSummaryFiles();
 
   return true;
@@ -370,15 +421,882 @@ bool BackgroundGenerator::Analyze()
 
 
 /******************************************************************************
+ * Generate a cosmic photon spectrum after
+ * Türler et al. 2010
+ *   doi:10.1051/0004-6361/200913072
+ * Mizuno et al. 2004
+ *   http://stacks.iop.org/0004-637X/614/i=2/a=1113
+ * Ackermann et al. 2015
+ *  doi:10.1088/0004-637X/799/1/86
+ */
+bool BackgroundGenerator::GenerateCosmicPhotonTurlerMizunoAckermann()
+{
+  mout<<endl;
+  mout<<"Generating a cosmic photon spectrum according to Turler, Mizuno, Ackermann..."<<endl;
+
+  if (IsValid(1, 1000000000) == false) {
+    return false;
+  }
+
+  auto Turler = [this] (double EnergykeV) {
+    double Flux = 0.109 / (pow(EnergykeV/28,1.4)+pow(EnergykeV/28,2.88));
+    return Flux;
+  };
+
+  auto Mizuno = [this] (double EnergykeV) {
+    double Flux = 40.*pow(EnergykeV/1000, -2.15)/(10000000);
+    return Flux;
+  };
+
+  auto Ackermann = [this] (double EnergykeV) {
+    double I100 = 0.95*pow(10,-7)/1000;
+    double gamma = 2.32;
+    double Ecut = 279*1000000;
+
+    double Flux = I100 * pow(EnergykeV/(100*1000),-gamma)*exp(EnergykeV/Ecut);
+    return Flux;
+  };
+
+  auto TurlerMizunoAckermann = [Turler, Ackermann, Mizuno] (double EnergykeV) {
+    if (EnergykeV < 890) return Turler(EnergykeV);
+    else if (EnergykeV > 1200) return Ackermann(EnergykeV);
+    else return Mizuno(EnergykeV);
+  };
+
+
+  vector<double> Spectrum;
+  for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
+    Spectrum.push_back(TurlerMizunoAckermann(m_EnergyBins[b]));
+  }
+
+  vector<double> Angle;
+  for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
+    if (m_AngleBins[b] < m_HorizonAngle) {
+      Angle.push_back(1.0);
+    } else {
+      Angle.push_back(0.0);
+    }
+  }
+
+  // Calculate flux:
+
+  // Integration factor over sphere
+  double AngleFactor = 2*c_Pi * (1 - cos(m_HorizonAngle*c_Rad));
+
+  // Determine the flux in ph/s/cm2 via numerical integration...
+  double Flux = 0;
+  int Bins = 10000;
+  double Min = log(m_EnergyMin);
+  double Max = log(m_EnergyMax);
+  double Dist = (Max-Min)/Bins;
+  for (double e = 0; e <= Bins-1; ++e) {
+    double EMin = exp(Min + e*Dist);
+    double EMax = exp(Min + (e+1)*Dist);
+    double Average = 0.5*(TurlerMizunoAckermann(EMin) + TurlerMizunoAckermann(EMax));
+    Flux += Average*(EMax-EMin);
+  }
+  cout<<"Anglefactor: "<<AngleFactor<<endl;
+  cout<<"Flux: "<<Flux<<" ph/cm2/s/sr"<<endl;
+  Flux *= AngleFactor;
+  cout<<"Average flux: "<<Flux<<" ph/cm2/s"<<endl;
+
+
+
+
+  WriteEnergyFile("CosmicPhotonTurlerMizunoAckermann", Spectrum);
+  WriteAngleFile("CosmicPhotonTurlerMizunoAckermann", Angle);
+  WriteSourceFile("CosmicPhotonTurlerMizunoAckermann", Flux, 1);
+
+  m_PhotonicSummaryFiles.push_back("CosmicPhotonTurlerMizunoAckermann");
+
+  return true;
+}
+
+/******************************************************************************
+ * Generate an albedo photon spectrum after
+ * Sazonov et al. 2007
+ *   doi:10.1111/j.1365-2966.2007.11746.x
+ * Churazov et al. 2006
+ *   doi:10.1111/j.1365-2966.2008.12918.x
+ * Türler et al. 2010
+ *   doi:10.1051/0004-6361/200913072
+ * Mizuno et al. 2004
+ *   http://stacks.iop.org/0004-637X/614/i=2/a=1113
+ * Abdo et al. 2009
+ *   doi:10.1103/PhysRevD.80.122004
+ * Mizuno is used as the absolute normalization
+ */
+bool BackgroundGenerator::GenerateAlbedoPhotonsSazonovChurazovMizunoAbdo()
+{
+  // Sazonov low energy component
+  auto Sazonov = [this](double EnergykeV) {
+
+    if (m_IsEarthOrbit == true) {
+      m_HorizonAngle = 90.0 + acos((m_EarthRadius + m_AtmosphereHeight)/(m_EarthRadius+m_Altitude))*c_Deg;
+    } else {
+      m_HorizonAngle = 180.0;
+    }
+
+    double thetamax = 180 - m_HorizonAngle;
+    double cosomega = cos(thetamax*c_Rad);
+    double phi = 650. / 1000.;
+
+    double num = 1.47*0.0178/(pow(phi/2.8,0.4)+pow(phi/2.8,1.5));
+    double den = sqrt(1+pow(m_AverageGeomagneticCutOff/(1.3*pow(phi,0.25)*(1+2.5*pow(phi,0.4))),2));
+    double fac = 3*cosomega*(1+cosomega)/5*c_Pi;
+
+    double c = fac*num/den;
+
+    return c / (pow(EnergykeV/44,-5)+pow(EnergykeV/44,1.4));
+  };
+
+  // Tuerler primary low energy component
+  auto TuerlerCosmicPhotons = [](double EnergykeV) {
+    return 0.109 / (pow(EnergykeV/28,1.4)+pow(EnergykeV/28, 2.88));
+  };
+  // Churazov low energy component
+  auto Churazov = [this, TuerlerCosmicPhotons](double EnergykeV) {
+
+    if (m_IsEarthOrbit == true) {
+      m_HorizonAngle = 90.0 + acos((m_EarthRadius + m_AtmosphereHeight)/(m_EarthRadius+m_Altitude))*c_Deg;
+    } else {
+      m_HorizonAngle = 180.0;
+    }
+
+    double thetamax = 180 - m_HorizonAngle; // deg max polar angle wrt nadir
+    double omega = 2*c_Pi*(1-cos(thetamax*c_Rad));
+
+    double first = 1.22/(pow(EnergykeV/28.5, -2.54)+pow(EnergykeV/51.3, 1.57)-0.37);
+    double second = (2.93+pow(EnergykeV/3.08, 4))/(1+pow(EnergykeV/3.08,4));
+    double third = (0.123+pow(EnergykeV/91.83,3.44))/(1+pow(EnergykeV/91.83, 3.44));
+
+    return omega*TuerlerCosmicPhotons(EnergykeV)*first*second*third;
+  };
+
+  auto ChurazovSazonov = [Churazov, Sazonov](double EnergykeV) {
+    return Churazov(EnergykeV)+Sazonov(EnergykeV);
+  };
+
+  // Mizuno downward component
+  auto Mizuno = [](double EnergykeV) {
+    // Valid above ~ 1 MeV
+    if (EnergykeV < 20000) {
+      return 1010.0*pow(EnergykeV/1000, -1.34) / 1000.0 / 10000.0;
+    } else if (EnergykeV >= 20000 && EnergykeV < 1000000) {
+      return 7290.0*pow(EnergykeV/1000, -2.0) / 1000.0 / 10000.0;
+    } else if (EnergykeV >= 1000000) {
+      return 29000*pow(EnergykeV/1000, -2.2) / 1000.0 / 10000.0;
+    }
+    return 0.0;
+  };
+
+  // Abdo FERMI
+  auto Abdo = [](double EnergykeV) {
+    // Valid from 200 MeV & up
+    return 1.823e-8*pow(EnergykeV/200000, -2.8);
+  };
+
+  auto ChurazovSazonovMizunoAbdo = [ChurazovSazonov, Mizuno, Abdo](double EnergykeV, double ScalerChurazovSazonov, double ScalerMizuno, double ScalerAbdo) {
+    if (EnergykeV < 1850) {
+      return ChurazovSazonov(EnergykeV)*ScalerChurazovSazonov;
+    } else if (EnergykeV > 200000) {
+      return Abdo(EnergykeV)*ScalerAbdo;
+    } else {
+      return Mizuno(EnergykeV)*ScalerMizuno;
+    }
+  };
+
+  if (m_IsEarthOrbit == false) return true;
+
+  mout<<endl;
+  mout<<"Generating an albedo photon spectrum according to Churazov Sazonov, Mizuno, Abdo..."<<endl;
+
+  if (IsValid(1, 1000000000) == false) {
+    return false;
+  }
+
+
+  vector<double> Angle;
+  for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
+    if (m_AngleBins[b] >= m_HorizonAngle) {
+      Angle.push_back(1.0);
+    } else {
+      Angle.push_back(0.0);
+    }
+  }
+
+  // Scaling from Mizuno et al.
+  double Rcut_desired = m_AverageGeomagneticCutOff;
+  double Rcut_Mizuno = 4.5;
+  double ScalerMizuno = pow(Rcut_desired/Rcut_Mizuno, -1.13);
+
+  // Make sure to scale the Churazov & Sazonov result to the Mizuno result at 1.85 MeV:
+  double MizunoValue = ScalerMizuno*Mizuno(1850);
+  double ChurazovSazonovValue = ChurazovSazonov(1850);
+  double ScalerChurazovSazonov= MizunoValue/ChurazovSazonovValue;
+
+  MizunoValue = ScalerMizuno*Mizuno(200000);
+  double AbdoValue = Abdo(200000);
+  double ScalerAbdo = MizunoValue/AbdoValue;
+
+  vector<double> Spectrum;
+  for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
+    Spectrum.push_back(ChurazovSazonovMizunoAbdo(m_EnergyBins[b], ScalerChurazovSazonov, ScalerMizuno, ScalerAbdo));
+    //cout<<m_EnergyBins[b]<<":"<<ChurazovSazonovMizunoAbdo(m_EnergyBins[b], ScalerChurazovSazonov, ScalerMizuno, ScalerAbdo)<<endl;
+  }
+
+
+  // Determine the flux in ph/s/cm2 via numerical integration...
+  double Flux = 0;
+  int Bins = 10000;
+  double Min = log(m_EnergyMin);
+  double Max = log(m_EnergyMax);
+  double Dist = (Max-Min)/Bins;
+  for (double e = 0; e <= Bins-1; ++e) {
+    double EMin = exp(Min + e*Dist);
+    double EMax = exp(Min + (e+1)*Dist);
+    double Average = 0.5*(ChurazovSazonovMizunoAbdo(EMin, ScalerChurazovSazonov, ScalerMizuno, ScalerAbdo) + ChurazovSazonovMizunoAbdo(EMax, ScalerChurazovSazonov, ScalerMizuno, ScalerAbdo));
+    Flux += Average*(EMax-EMin);
+  }
+  // Integration factor over sphere
+  double AngleFactor = 2*c_Pi * (cos(m_HorizonAngle*c_Rad) - (-1));
+
+  cout<<"Angle-factor: "<<AngleFactor<<endl;
+  cout<<"Flux: "<<Flux<<" ph/cm2/s/sr"<<endl;
+  Flux *= AngleFactor;
+  cout<<"Flux: "<<Flux<<" ph/cm2/s"<<endl;
+
+  MString Comments;
+  Comments += "# Albedo photons determinined after Sazonov et al. 2007 & Churazov et al. 2006 (Turler+ 2010), Mizuno+ 2004, Abdo+ 2009\n";
+  Comments += "# Assumptions: \n";
+  Comments += "# (1) Use Churazov+Sazonov below 1850 keV, Abdo+ above 200 MeV, Mizuno in between \n";
+  Comments += "# (2) Everything is normalized to Mizuno \n";
+  Comments += "# (3) Geomagnetic cutoff difference scaled as in Mizuno \n";
+  Comments += "# (4) Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";
+  Comments += "# (5) Limb brightening and darkening is NOT included\n";
+  Comments += "# (6) There should be a bump form the 511-keV-Compton scatters belog ~450 keV which is NOT included \n";
+
+  WriteEnergyFile("AlbedoPhotonsChurazovSazonovMizunoAbdo", Spectrum);
+  WriteAngleFile("AlbedoPhotonsChurazovSazonovMizunoAbdo", Angle);
+  WriteSourceFile("AlbedoPhotonsChurazovSazonovMizunoAbdo", Flux, 1, Comments);
+
+  m_PhotonicSummaryFiles.push_back("AlbedoPhotonsChurazovSazonovMizunoAbdo");
+
+  return true;
+}
+
+/******************************************************************************
+ * Generate a cosmic alpha particle spectrum from AMS data
+ * Aguilar et al. 2015b
+ *   doi:10.1103/PhysRevLett.115.211101
+ */
+bool BackgroundGenerator::GenerateCosmicAlphasAguilar()
+{
+  mout<<endl;
+  mout<<"Generating a cosmic alpha particle spectrum using AMS data..."<<endl;
+
+  if (IsValid(1, 1000000000) == false) {
+    return false;
+  }
+
+  ifstream in;
+  MString m_AverageCosmicAlphasAguilar = "./AguilarAlphas.dat";
+  in.open(m_AverageCosmicAlphasAguilar);
+  if (in.is_open() == false) {
+    mout<<"Error: Unable to open file "<<m_AverageCosmicAlphasAguilar<<endl;
+    return false;
+  }
+
+  vector<double> Energies;
+  vector<double> Fluxes;
+
+  double E0 = 2*(0.938 + 0.940);
+
+  MString Line;
+  bool Start = false;
+  while (in.good() == true) {
+    Line.ReadLine(in);
+    if (Line.Length() < 2) continue;
+    if (Line.Contains("Flux") == true) {
+      Start = true;
+      continue;
+    }
+    if (Line.Contains("End of File") == true) break;
+    if (Start == false) continue;
+    vector<MString> Tokens = Line.Tokenize(" ");
+    if (Tokens.size() != 2) {
+      cout<<"Error: The line should have two tokens, rigidity, and differential flux"<<endl;
+      cout<<Line<<endl;
+      continue;
+    }
+
+    double Flux = atof(Tokens[1])*atof(Tokens[0]);
+    double Energy = 4*(sqrt(pow(E0,2)+pow((atof(Tokens[0])/2),2))-E0)*1000000;
+    Flux = Flux/Energy/10000;
+
+    if (Flux > 0) {
+      //cout<<Line<<endl;
+      Energies.push_back(Energy);
+      Fluxes.push_back(Flux);
+    }
+  }
+
+  auto Interp = [this, Energies, Fluxes] (double EnergykeV) {
+
+    //solar modulation potential (MV): ~550 for solar minimum ~1100 for solar maximum
+    double solmod = 650.;
+
+    double E0 = 2*(0.938 + 0.940);
+
+    // Geomagnetic modulation factor from Mizuno et al. 2004
+    double Rigidity = sqrt(EnergykeV*EnergykeV/1000000/1000000 + 2*EnergykeV*E0/1000000);
+    double redfac = 1/(1+pow(Rigidity/m_AverageGeomagneticCutOff,-12.0));
+
+    //Solar modulation factor from Gleeson & Axford 1968
+    double solmodfac = ((EnergykeV/1000000+E0)*(EnergykeV/1000000+E0)-E0*E0)/(
+                (EnergykeV/1000000+E0+solmod/1000)*(EnergykeV/1000000+E0+solmod/1000)-E0*E0);
+
+    double modfac = solmodfac * redfac;
+
+    double Flux = 0.0;
+    if (EnergykeV < Energies[0]) {
+      double m = (log(modfac*Fluxes[1]) - log(modfac*Fluxes[0]))/(log(Energies[1]) - log(Energies[0]));
+      double t = log(modfac*Fluxes[1]) - m * log(Energies[1]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else if (EnergykeV > Energies.back()) {
+      int Last = Energies.size() - 1;
+      double m = (log(modfac*Fluxes[Last]) - log(modfac*Fluxes[Last-1]))/(log(Energies[Last]) - log(Energies[Last-1]));
+      double t = log(modfac*Fluxes[Last]) - m * log(Energies[Last]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else {
+      for (unsigned int e = 1; e < Energies.size(); ++e) {
+        if (EnergykeV < Energies[e]) {
+          double m = (log(modfac*Fluxes[e]) - log(modfac*Fluxes[e-1]))/(log(Energies[e]) - log(Energies[e-1]));
+          double t = log(modfac*Fluxes[e]) - m * log(Energies[e]);
+          double logy = m * log(EnergykeV) + t;
+          Flux = exp(logy);
+          break;
+        }
+      }
+    }
+
+    return Flux;
+  };
+
+
+
+  vector<double> Angle;
+  for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
+    if (m_AngleBins[b] <= m_HorizonAngle) {
+      Angle.push_back(1.0);
+    } else {
+      Angle.push_back(0.0);
+    }
+  }
+
+  vector<double> Spectrum;
+  for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
+    Spectrum.push_back(Interp(m_EnergyBins[b]));
+  }
+
+
+  // Determine the flux in ph/s/cm2 via numerical integration...
+  double Flux = 0;
+  int Bins = 10000;
+  double Min = log(m_EnergyMin);
+  double Max = log(m_EnergyMax);
+  double Dist = (Max-Min)/Bins;
+  for (double e = 0; e <= Bins-1; ++e) {
+    double EMin = exp(Min + e*Dist);
+    double EMax = exp(Min + (e+1)*Dist);
+    double Average = 0.5*(Interp(EMin) + Interp(EMax));
+    Flux += Average*(EMax-EMin);
+  }
+  // Integration factor over sphere
+  double AngleFactor = 2*c_Pi * (1 - cos(m_HorizonAngle*c_Rad));
+
+  cout<<"Angle-factor: "<<AngleFactor<<endl;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s/sr"<<endl;
+  Flux *= AngleFactor;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s"<<endl;
+
+  MString Comments;
+  Comments += "# Cosmic alpha particles using AMS data\n";
+  Comments += "# Assumptions: \n";
+  Comments += "# * log-log extrapolation from AMS data\n";
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
+  WriteEnergyFile("CosmicAlphasAguilar", Spectrum);
+  WriteAngleFile("CosmicAlphasAguilar", Angle);
+  WriteSourceFile("CosmicAlphasAguilar", Flux, 21, Comments);
+
+  m_HadronicSummaryFiles.push_back("CosmicAlphasAguilar");
+
+  return true;
+}
+
+/******************************************************************************
+ * Generate a cosmic proton particle spectrum from AMS data
+ * Aguilar et al. 2015
+ *   doi:10.1103/PhysRevLett.114.171103
+ */
+bool BackgroundGenerator::GenerateCosmicProtonsAguilar()
+{
+  mout<<endl;
+  mout<<"Generating a cosmic protons spectrum using AMS data..."<<endl;
+
+  if (IsValid(1, 1000000000) == false) {
+    return false;
+  }
+
+  ifstream in;
+  MString m_AverageCosmicProtonsAguilar = "./AguilarProton.dat";
+  in.open(m_AverageCosmicProtonsAguilar);
+  if (in.is_open() == false) {
+    mout<<"Error: Unable to open file "<<m_AverageCosmicProtonsAguilar<<endl;
+    return false;
+  }
+
+  vector<double> Energies;
+  vector<double> Fluxes;
+
+  double E0 = 0.938;
+
+  MString Line;
+  bool Start = false;
+  while (in.good() == true) {
+    Line.ReadLine(in);
+    if (Line.Length() < 2) continue;
+    if (Line.Contains("Flux") == true) {
+      Start = true;
+      continue;
+    }
+    if (Line.Contains("End of File") == true) break;
+    if (Start == false) continue;
+    vector<MString> Tokens = Line.Tokenize(" ");
+    if (Tokens.size() != 2) {
+      cout<<"Error: The line should have two tokens, rigidity, and differential flux"<<endl;
+      cout<<Line<<endl;
+      continue;
+    }
+
+    double Flux = atof(Tokens[1])*atof(Tokens[0]);
+    double Energy = (sqrt(pow(E0,2)+pow((atof(Tokens[0])/2),2))-E0)*1000000;
+    Flux = Flux/Energy/10000;
+
+    if (Flux > 0) {
+      //cout<<Line<<endl;
+      Energies.push_back(Energy);
+      Fluxes.push_back(Flux);
+    }
+  }
+
+  auto Interp = [this, Energies, Fluxes] (double EnergykeV) {
+
+    //solar modulation potential (MV): ~550 for solar minimum ~1100 for solar maximum
+    double solmod = 650.;
+
+    double E0 = 0.938;
+
+    // Geomagnetic modulation factor from Mizuno et al. 2004
+    double Rigidity = sqrt(EnergykeV*EnergykeV/1000000/1000000 + 2*EnergykeV*E0/1000000);
+    double redfac = 1/(1+pow(Rigidity/m_AverageGeomagneticCutOff,-12.0));
+
+    //Solar modulation factor from Gleeson & Axford 1968
+    double solmodfac = ((EnergykeV/1000000+E0)*(EnergykeV/1000000+E0)-E0*E0)/(
+                (EnergykeV/1000000+E0+solmod/1000)*(EnergykeV/1000000+E0+solmod/1000)-E0*E0);
+
+  double   modfac = solmodfac * redfac;
+
+    double Flux = 0.0;
+    if (EnergykeV < Energies[0]) {
+      double m = (log(modfac*Fluxes[1]) - log(modfac*Fluxes[0]))/(log(Energies[1]) - log(Energies[0]));
+      double t = log(modfac*Fluxes[1]) - m * log(Energies[1]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else if (EnergykeV > Energies.back()) {
+      int Last = Energies.size() - 1;
+      double m = (log(modfac*Fluxes[Last]) - log(modfac*Fluxes[Last-1]))/(log(Energies[Last]) - log(Energies[Last-1]));
+      double t = log(modfac*Fluxes[Last]) - m * log(Energies[Last]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else {
+      for (unsigned int e = 1; e < Energies.size(); ++e) {
+        if (EnergykeV < Energies[e]) {
+          double m = (log(modfac*Fluxes[e]) - log(modfac*Fluxes[e-1]))/(log(Energies[e]) - log(Energies[e-1]));
+          double t = log(modfac*Fluxes[e]) - m * log(Energies[e]);
+          double logy = m * log(EnergykeV) + t;
+          Flux = exp(logy);
+          break;
+        }
+      }
+    }
+
+    return Flux;
+  };
+
+
+
+  vector<double> Angle;
+  for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
+    if (m_AngleBins[b] <= m_HorizonAngle) {
+      Angle.push_back(1.0);
+    } else {
+      Angle.push_back(0.0);
+    }
+  }
+
+  vector<double> Spectrum;
+  for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
+    Spectrum.push_back(Interp(m_EnergyBins[b]));
+  }
+
+
+  // Determine the flux in ph/s/cm2 via numerical integration...
+  double Flux = 0;
+  int Bins = 10000;
+  double Min = log(m_EnergyMin);
+  double Max = log(m_EnergyMax);
+  double Dist = (Max-Min)/Bins;
+  for (double e = 0; e <= Bins-1; ++e) {
+    double EMin = exp(Min + e*Dist);
+    double EMax = exp(Min + (e+1)*Dist);
+    double Average = 0.5*(Interp(EMin) + Interp(EMax));
+    Flux += Average*(EMax-EMin);
+  }
+  // Integration factor over sphere
+  double AngleFactor = 2*c_Pi * (1 - cos(m_HorizonAngle*c_Rad));
+
+  cout<<"Angle-factor: "<<AngleFactor<<endl;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s/sr"<<endl;
+  Flux *= AngleFactor;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s"<<endl;
+
+  MString Comments;
+  Comments += "# Cosmic protons using AMS data\n";
+  Comments += "# Assumptions: \n";
+  Comments += "# * log-log extrapolation from AMS data\n";
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
+  WriteEnergyFile("CosmicProtonsAguilar", Spectrum);
+  WriteAngleFile("CosmicProtonsAguilar", Angle);
+  WriteSourceFile("CosmicProtonsAguilar", Flux, 21, Comments);
+
+  m_HadronicSummaryFiles.push_back("CosmicProtonsAguilar");
+
+  return true;
+}
+
+
+/******************************************************************************
+ * Generate a cosmic electron spectrum from AMS data
+ * Aguilar et al. 2014
+ *   doi:10.1103/PhysRevLett.113.121102
+ */
+bool BackgroundGenerator::GenerateCosmicElectronsAguilar()
+{
+  mout<<endl;
+  mout<<"Generating a cosmic electrons spectrum using AMS data..."<<endl;
+
+  if (IsValid(1, 1000000000) == false) {
+    return false;
+  }
+
+  ifstream in;
+  MString m_AverageCosmicEPAguilar = "./AguilarElectronPositron.dat";
+  in.open(m_AverageCosmicEPAguilar);
+  if (in.is_open() == false) {
+    mout<<"Error: Unable to open file "<<m_AverageCosmicEPAguilar<<endl;
+    return false;
+  }
+
+  vector<double> Energies;
+  vector<double> Fluxes;
+
+  MString Line;
+  bool Start = false;
+  while (in.good() == true) {
+    Line.ReadLine(in);
+    if (Line.Length() < 2) continue;
+    if (Line.Contains("EkeV") == true) {
+      Start = true;
+      continue;
+    }
+    if (Start == false) continue;
+    vector<MString> Tokens = Line.Tokenize(" ");
+    if (Tokens.size() != 3) {
+      cout<<"Error: The line should have two tokens, rigidity, and differential flux"<<endl;
+      cout<<Line<<endl;
+      continue;
+    }
+
+    double Flux = atof(Tokens[1])/pow(10,10);
+    double Energy = atof(Tokens[0]);
+
+    if (Flux > 0) {
+      //cout<<Energy<<" "<<Flux<<endl;
+      Energies.push_back(Energy);
+      Fluxes.push_back(Flux);
+    }
+  }
+
+  auto Interp = [this, Energies, Fluxes] (double EnergykeV) {
+
+    //solar modulation potential (MV): ~550 for solar minimum ~1100 for solar maximum
+    double solmod = 650.;
+
+    double E0 = 0.511/1000;
+
+    // Geomagnetic modulation factor from Mizuno et al. 2004
+    double Rigidity = sqrt(EnergykeV*EnergykeV/1000000/1000000 + 2*EnergykeV*E0/1000000);
+    double redfac = 1/(1+pow(Rigidity/m_AverageGeomagneticCutOff,-6.0));
+
+    //Solar modulation factor from Gleeson & Axford 1968
+    double solmodfac = ((EnergykeV/1000000+E0)*(EnergykeV/1000000+E0)-E0*E0)/(
+                (EnergykeV/1000000+E0+solmod/1000)*(EnergykeV/1000000+E0+solmod/1000)-E0*E0);
+
+    double modfac = solmodfac * redfac;
+
+    double Flux = 0.0;
+    if (EnergykeV < Energies[0]) {
+      double m = (log(modfac*Fluxes[1]) - log(modfac*Fluxes[0]))/(log(Energies[1]) - log(Energies[0]));
+      double t = log(modfac*Fluxes[1]) - m * log(Energies[1]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else if (EnergykeV > Energies.back()) {
+      int Last = Energies.size() - 1;
+      double m = (log(modfac*Fluxes[Last]) - log(modfac*Fluxes[Last-1]))/(log(Energies[Last]) - log(Energies[Last-1]));
+      double t = log(modfac*Fluxes[Last]) - m * log(Energies[Last]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else {
+      for (unsigned int e = 1; e < Energies.size(); ++e) {
+        if (EnergykeV < Energies[e]) {
+          double m = (log(modfac*Fluxes[e]) - log(modfac*Fluxes[e-1]))/(log(Energies[e]) - log(Energies[e-1]));
+          double t = log(modfac*Fluxes[e]) - m * log(Energies[e]);
+          double logy = m * log(EnergykeV) + t;
+          Flux = exp(logy);
+          break;
+        }
+      }
+    }
+
+    return Flux;
+  };
+
+
+
+  vector<double> Angle;
+  for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
+    if (m_AngleBins[b] <= m_HorizonAngle) {
+      Angle.push_back(1.0);
+    } else {
+      Angle.push_back(0.0);
+    }
+  }
+
+  vector<double> Spectrum;
+  for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
+    Spectrum.push_back(Interp(m_EnergyBins[b]));
+  }
+
+
+  // Determine the flux in ph/s/cm2 via numerical integration...
+  double Flux = 0;
+  int Bins = 10000;
+  double Min = log(m_EnergyMin);
+  double Max = log(m_EnergyMax);
+  double Dist = (Max-Min)/Bins;
+  for (double e = 0; e <= Bins-1; ++e) {
+    double EMin = exp(Min + e*Dist);
+    double EMax = exp(Min + (e+1)*Dist);
+    double Average = 0.5*(Interp(EMin) + Interp(EMax));
+    Flux += Average*(EMax-EMin);
+  }
+  // Integration factor over sphere
+  double AngleFactor = 2*c_Pi * (1 - cos(m_HorizonAngle*c_Rad));
+
+  cout<<"Angle-factor: "<<AngleFactor<<endl;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s/sr"<<endl;
+  Flux *= AngleFactor;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s"<<endl;
+
+  MString Comments;
+  Comments += "# Cosmic electrons using AMS data\n";
+  Comments += "# Assumptions: \n";
+  Comments += "# * log-log extrapolation from AMS data\n";
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
+  WriteEnergyFile("CosmicElectronsAguilar", Spectrum);
+  WriteAngleFile("CosmicElectronsAguilar", Angle);
+  WriteSourceFile("CosmicElectronsAguilar", Flux, 21, Comments);
+
+  m_HadronicSummaryFiles.push_back("CosmicElectronsAguilar");
+
+  return true;
+}
+
+/******************************************************************************
+ * Generate a cosmic positron spectrum from AMS data
+ * Aguilar et al. 2014
+ *   doi:10.1103/PhysRevLett.113.121102
+ */
+bool BackgroundGenerator::GenerateCosmicPositronsAguilar()
+{
+  mout<<endl;
+  mout<<"Generating a cosmic positrons spectrum using AMS data..."<<endl;
+
+  if (IsValid(1, 1000000000) == false) {
+    return false;
+  }
+
+  ifstream in;
+  MString m_AverageCosmicEPAguilar = "./AguilarElectronPositron.dat";
+  in.open(m_AverageCosmicEPAguilar);
+  if (in.is_open() == false) {
+    mout<<"Error: Unable to open file "<<m_AverageCosmicEPAguilar<<endl;
+    return false;
+  }
+
+  vector<double> Energies;
+  vector<double> Fluxes;
+
+  MString Line;
+  bool Start = false;
+  while (in.good() == true) {
+    Line.ReadLine(in);
+    if (Line.Length() < 2) continue;
+    if (Line.Contains("EkeV") == true) {
+      Start = true;
+      continue;
+    }
+    if (Line.Contains("End of File") == true) break;
+    if (Start == false) continue;
+    vector<MString> Tokens = Line.Tokenize(" ");
+    if (Tokens.size() != 3) {
+      cout<<"Error: The line should have two tokens, rigidity, and differential flux"<<endl;
+      cout<<Line<<endl;
+      continue;
+    }
+
+    double Flux = atof(Tokens[2])/pow(10,10);
+    double Energy = atof(Tokens[0]);
+
+    if (Flux > 0) {
+      //cout<<Line<<endl;
+      Energies.push_back(Energy);
+      Fluxes.push_back(Flux);
+    }
+  }
+
+  auto Interp = [this, Energies, Fluxes] (double EnergykeV) {
+
+    //solar modulation potential (MV): ~550 for solar minimum ~1100 for solar maximum
+    double solmod = 650.;
+
+    double E0 = 0.511/1000;
+
+    // Geomagnetic modulation factor from Mizuno et al. 2004
+    double Rigidity = sqrt(EnergykeV*EnergykeV/1000000/1000000 + 2*EnergykeV*E0/1000000);
+    double redfac = 1/(1+pow(Rigidity/m_AverageGeomagneticCutOff,-6.0));
+
+    //Solar modulation factor from Gleeson & Axford 1968
+    double solmodfac = ((EnergykeV/1000000+E0)*(EnergykeV/1000000+E0)-E0*E0)/(
+                (EnergykeV/1000000+E0+solmod/1000)*(EnergykeV/1000000+E0+solmod/1000)-E0*E0);
+
+    double modfac = solmodfac * redfac;
+
+    double Flux = 0.0;
+    if (EnergykeV < Energies[0]) {
+      double m = (log(modfac*Fluxes[1]) - log(modfac*Fluxes[0]))/(log(Energies[1]) - log(Energies[0]));
+      double t = log(modfac*Fluxes[1]) - m * log(Energies[1]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else if (EnergykeV > Energies.back()) {
+      int Last = Energies.size() - 1;
+      double m = (log(modfac*Fluxes[Last]) - log(modfac*Fluxes[Last-1]))/(log(Energies[Last]) - log(Energies[Last-1]));
+      double t = log(modfac*Fluxes[Last]) - m * log(Energies[Last]);
+      double logy = m * log(EnergykeV) + t;
+      Flux = exp(logy);
+    } else {
+      for (unsigned int e = 1; e < Energies.size(); ++e) {
+        if (EnergykeV < Energies[e]) {
+          double m = (log(modfac*Fluxes[e]) - log(modfac*Fluxes[e-1]))/(log(Energies[e]) - log(Energies[e-1]));
+          double t = log(modfac*Fluxes[e]) - m * log(Energies[e]);
+          double logy = m * log(EnergykeV) + t;
+          Flux = exp(logy);
+          break;
+        }
+      }
+    }
+
+    return Flux;
+  };
+
+
+
+  vector<double> Angle;
+  for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
+    if (m_AngleBins[b] <= m_HorizonAngle) {
+      Angle.push_back(1.0);
+    } else {
+      Angle.push_back(0.0);
+    }
+  }
+
+  vector<double> Spectrum;
+  for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
+    Spectrum.push_back(Interp(m_EnergyBins[b]));
+  }
+
+
+  // Determine the flux in ph/s/cm2 via numerical integration...
+  double Flux = 0;
+  int Bins = 10000;
+  double Min = log(m_EnergyMin);
+  double Max = log(m_EnergyMax);
+  double Dist = (Max-Min)/Bins;
+  for (double e = 0; e <= Bins-1; ++e) {
+    double EMin = exp(Min + e*Dist);
+    double EMax = exp(Min + (e+1)*Dist);
+    double Average = 0.5*(Interp(EMin) + Interp(EMax));
+    Flux += Average*(EMax-EMin);
+  }
+  // Integration factor over sphere
+  double AngleFactor = 2*c_Pi * (1 - cos(m_HorizonAngle*c_Rad));
+
+  cout<<"Angle-factor: "<<AngleFactor<<endl;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s/sr"<<endl;
+  Flux *= AngleFactor;
+  cout<<"Flux: "<<Flux<<" particle/cm2/s"<<endl;
+
+  MString Comments;
+  Comments += "# Cosmic positrons using AMS data\n";
+  Comments += "# Assumptions: \n";
+  Comments += "# * log-log extrapolation from AMS data\n";
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
+  WriteEnergyFile("GenerateCosmicPositronsAguilar", Spectrum);
+  WriteAngleFile("GenerateCosmicPositronsAguilar", Angle);
+  WriteSourceFile("GenerateCosmicPositronsAguilar", Flux, 21, Comments);
+
+  m_HadronicSummaryFiles.push_back("GenerateCosmicPositronsAguilar");
+
+  return true;
+}
+
+/******************************************************************************
  * Generate an albedo photon spectrum after Ajello et al. 2008 & Mizuno 2004
- * Mizuno is used as the absolute normalization and the Ajello shape is scaled 
+ * Mizuno is used as the absolute normalization and the Ajello shape is scaled
  * to the Mizuno normalization
  */
 bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
 {
-  auto Ajello = [](double EnergykeV) {   
+  auto Ajello = [](double EnergykeV) {
     // Valid up to ~ 1MeV
-    return 0.0148/(pow(EnergykeV/33.7, -5) + pow(EnergykeV/33.7, 1.72)); 
+    return 0.0148/(pow(EnergykeV/33.7, -5) + pow(EnergykeV/33.7, 1.72));
   };
 
   /* Mizuno downward:
@@ -392,7 +1310,7 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
     return 0.0;
   };
   */
-  
+
   // Mizuno upward
   auto Mizuno = [](double EnergykeV) {
     // Valid above ~ 1 MeV
@@ -405,15 +1323,15 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
     }
     return 0.0;
   };
-  
+
   auto AjelloMizuno = [Ajello, Mizuno](double EnergykeV, double ScalerAjello, double ScalerMizuno) {
-    if (EnergykeV < 1000) { 
+    if (EnergykeV < 1000) {
       return Ajello(EnergykeV)*ScalerAjello;
     } else {
       return Mizuno(EnergykeV)*ScalerMizuno;
     }
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
 
   mout<<endl;
@@ -422,8 +1340,8 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -432,7 +1350,7 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
       Angle.push_back(0.0);
     }
   }
-  
+
   // Scaling from Mizuno et al.
   double Rcut_desired = m_AverageGeomagneticCutOff;
   double Rcut_Mizuno = 4.5;
@@ -448,8 +1366,8 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
     Spectrum.push_back(AjelloMizuno(m_EnergyBins[b], ScalerAjello, ScalerMizuno));
     cout<<m_EnergyBins[b]<<":"<<AjelloMizuno(m_EnergyBins[b], ScalerAjello, ScalerMizuno)<<endl;
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -475,15 +1393,15 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
   Comments += "# Assumptions: \n";
   Comments += "# (1) Use Ajello below 1 MeV, Mizuno above \n";
   Comments += "# (2) Geomegnetic cutoff difference scaled as in Mizuno \n";
-  Comments += "# (3) Ajello normalized to Mizuno \n";  
-  Comments += "# (4) Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";  
-  
+  Comments += "# (3) Ajello normalized to Mizuno \n";
+  Comments += "# (4) Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";
+
   WriteEnergyFile("AlbedoPhotonsAjelloMizuno", Spectrum);
   WriteAngleFile("AlbedoPhotonsAjelloMizuno", Angle);
   WriteSourceFile("AlbedoPhotonsAjelloMizuno", Flux, 1, Comments);
 
   m_PhotonicSummaryFiles.push_back("AlbedoPhotonsAjelloMizuno");
-  
+
   return true;
 }
 
@@ -491,7 +1409,7 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsAjelloMizuno()
 
 /******************************************************************************
  * Generate an albedo photon spectrum after Tuerler+ (A&A 512, A49, 2010) & Mizuno 2004 & Abdo (PHYSICAL REVIEW D80, 122004, 2009)
- * Mizuno is used as the absolute normalization and the Ajello shape is scaled 
+ * Mizuno is used as the absolute normalization and the Ajello shape is scaled
  * to the Mizuno normalization
  */
 bool BackgroundGenerator::GenerateAlbedoPhotonsTuerlerMizunoAbdo()
@@ -504,7 +1422,7 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsTuerlerMizunoAbdo()
       return 0.05*pow(49.4, 1.78-0.37)*pow(EnergykeV, -1.78);
     }
   };
-  
+
   // Mizuno downward component
   auto Mizuno = [](double EnergykeV) {
     // Valid above ~ 1 MeV
@@ -517,33 +1435,33 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsTuerlerMizunoAbdo()
     }
     return 0.0;
   };
-  
+
   // Abdo FERMI
-  auto Abdo = [](double EnergykeV) {   
+  auto Abdo = [](double EnergykeV) {
     // Valid from 200 MeV & up
     return 1.823e-8*pow(EnergykeV/200000, -2.8);
   };
-  
+
   auto TuerlerMizunoAbdo = [Tuerler, Mizuno, Abdo](double EnergykeV, double ScalerTuerler, double ScalerMizuno, double ScalerAbdo) {
-    if (EnergykeV < 750) { 
+    if (EnergykeV < 750) {
       return Tuerler(EnergykeV)*ScalerTuerler;
-    } else if (EnergykeV > 200000) { 
+    } else if (EnergykeV > 200000) {
       return Abdo(EnergykeV)*ScalerAbdo;
     } else {
       return Mizuno(EnergykeV)*ScalerMizuno;
     }
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
-  
+
   mout<<endl;
   mout<<"Generating an albedo photon spectrum according to Tuerler and Mizuno..."<<endl;
-  
+
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -552,28 +1470,28 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsTuerlerMizunoAbdo()
       Angle.push_back(0.0);
     }
   }
-  
+
   // Scaling from Mizuno et al.
   double Rcut_desired = m_AverageGeomagneticCutOff;
   double Rcut_Mizuno = 4.5;
   double ScalerMizuno = pow(Rcut_desired/Rcut_Mizuno, -1.13);
-  
+
   // Make sure to scale the Tuerler result to the Mizuno result at 1 MeV:
   double MizunoValue = ScalerMizuno*Mizuno(750);
   double TuerlerValue = Tuerler(750);
   double ScalerTuerler = MizunoValue/TuerlerValue;
-  
+
   MizunoValue = ScalerMizuno*Mizuno(200000);
   double AbdoValue = Abdo(200000);
   double ScalerAbdo = MizunoValue/AbdoValue;
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(TuerlerMizunoAbdo(m_EnergyBins[b], ScalerTuerler, ScalerMizuno, ScalerAbdo));
     cout<<m_EnergyBins[b]<<":"<<TuerlerMizunoAbdo(m_EnergyBins[b], ScalerTuerler, ScalerMizuno, ScalerAbdo)<<endl;
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -588,12 +1506,12 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsTuerlerMizunoAbdo()
   }
   // Integration factor over sphere
   double AngleFactor = 2*c_Pi * (cos(m_HorizonAngle*c_Rad) - (-1));
-  
+
   cout<<"Angle-factor: "<<AngleFactor<<endl;
   cout<<"Flux: "<<Flux<<" ph/cm2/s/sr"<<endl;
   Flux *= AngleFactor;
   cout<<"Flux: "<<Flux<<" ph/cm2/s"<<endl;
-  
+
   MString Comments;
   Comments += "# Albedo photons determinined after Turler+ 2010, Mizuno+ 2004, Abdo+ 2009\n";
   Comments += "# Assumptions: \n";
@@ -605,13 +1523,13 @@ bool BackgroundGenerator::GenerateAlbedoPhotonsTuerlerMizunoAbdo()
   Comments += "# (6) The lower energy limit is ~20 keV \n";
   Comments += "# (7) Limb brightening and darkening is NOT included\n";
   Comments += "# (8) There should be a bump form the 511-keV-Compton scatters belog ~450 keV which is NOT included \n";
-  
+
   WriteEnergyFile("AlbedoPhotonsTuerlerMizunoAbdo", Spectrum);
   WriteAngleFile("AlbedoPhotonsTuerlerMizunoAbdo", Angle);
   WriteSourceFile("AlbedoPhotonsTuerlerMizunoAbdo", Flux, 1, Comments);
-  
+
   m_PhotonicSummaryFiles.push_back("AlbedoPhotonsTuerlerMizunoAbdo");
-  
+
   return true;
 }
 
@@ -633,7 +1551,7 @@ bool BackgroundGenerator::GenerateAlbedoPhotonLinesHarris()
 
   cout<<"Energy: Mono"<<endl;
   cout<<"Beam: Assume symmetric"<<endl;
-  
+
   // SMM average orbit: 400-570 km
   double SMMAltitude = 500;
   // SMM fluxes: in 10-3 ph/cm2/s
@@ -641,7 +1559,7 @@ bool BackgroundGenerator::GenerateAlbedoPhotonLinesHarris()
   // 29.9 ± 0.1 - 31.6 ± 0.1 (7 - 11 GV)
   // 23.3 ± 0.1 - 22.2 ± 0.1 (> 11 GV)
   double SMMFlux = 22.7E-3;
-  
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] < m_HorizonAngle) {
@@ -650,20 +1568,20 @@ bool BackgroundGenerator::GenerateAlbedoPhotonLinesHarris()
       Angle.push_back(0.0);
     }
   }
-  
+
   // Scale Flux with altitude
   double Flux = SMMFlux * SMMAltitude*SMMAltitude / (m_Altitude*m_Altitude);
 
   WriteAngleFile("AnnihilationLineHarris", Angle);
-  
-  
+
+
   MString Comments;
   Comments += "# Annihilation line determined after Harris, JGR v.108, 2003\n";
   Comments += "# Assumptions: Average geomagnetic cut-off > 11 GV \n";
   Comments += "#              Average SMM altitude 500 \n";
-  
+
   WriteSourceFile("AnnihilationLineHarris", Flux, 1, Comments, "Mono 511");
-  
+
   m_PhotonicSummaryFiles.push_back("AnnihilationLineHarris");
 
   return true;
@@ -681,7 +1599,7 @@ bool BackgroundGenerator::GenerateAlbedoElectronsAlcarazMizuno()
     double b = 4.0;
     double Ebreak = 3.0;
 
-    double Flux = 0.0; 
+    double Flux = 0.0;
     if (EnergyGeV < 0.001) return 0.0;
     if (EnergyGeV < Ebreak) {
       if (EnergyGeV < 0.1) {
@@ -691,12 +1609,12 @@ bool BackgroundGenerator::GenerateAlbedoElectronsAlcarazMizuno()
       }
     } else {
       Flux = F0 * pow(Ebreak/0.1, -a) * pow(EnergyGeV/Ebreak, -b); // e/m2/s/sr/MeV
-    }    
-    
+    }
+
     Flux /= (1000*10000); // p/cm2/s/sr/keV
     return Flux;
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
 
   mout<<endl;
@@ -705,8 +1623,8 @@ bool BackgroundGenerator::GenerateAlbedoElectronsAlcarazMizuno()
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -720,8 +1638,8 @@ bool BackgroundGenerator::GenerateAlbedoElectronsAlcarazMizuno()
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(AlcarazMizuno(m_EnergyBins[b]/1000000));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -746,14 +1664,14 @@ bool BackgroundGenerator::GenerateAlbedoElectronsAlcarazMizuno()
   Comments += "# Albedo electrons determinined after Alcaraz 2000 & Mizuno 2004\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Only valid near the equator! \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";
+
   WriteEnergyFile("AlbedoElectronsAlcarazMizuno", Spectrum);
   WriteAngleFile("AlbedoElectronsAlcarazMizuno", Angle);
   WriteSourceFile("AlbedoElectronsAlcarazMizuno", Flux, 3, Comments);
-  
+
   m_LeptonicSummaryFiles.push_back("AlbedoElectronsAlcarazMizuno");
-  
+
   return true;
 }
 
@@ -780,11 +1698,11 @@ bool BackgroundGenerator::GenerateAlbedoPositronsAlcarazMizuno()
     } else {
       Flux = F0 * pow(Ebreak/0.1, -a) * pow(EnergyGeV/Ebreak, -b); // p/m2/s/sr/MeV
     }
-    
+
     Flux /= (1000*10000); // p/cm2/s/sr/keV
     return Flux;
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
 
   mout<<endl;
@@ -793,8 +1711,8 @@ bool BackgroundGenerator::GenerateAlbedoPositronsAlcarazMizuno()
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -808,8 +1726,8 @@ bool BackgroundGenerator::GenerateAlbedoPositronsAlcarazMizuno()
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(AlcarazMizuno(m_EnergyBins[b]/1000000));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -834,14 +1752,14 @@ bool BackgroundGenerator::GenerateAlbedoPositronsAlcarazMizuno()
   Comments += "# Albedo positrons determinined after Alcaraz 2000 & Mizuno 2004\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Don't remember... \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";
+
   WriteEnergyFile("AlbedoPositronsAlcarazMizuno", Spectrum);
   WriteAngleFile("AlbedoPositronsAlcarazMizuno", Angle);
   WriteSourceFile("AlbedoPositronsAlcarazMizuno", Flux, 2, Comments);
-  
+
   m_LeptonicSummaryFiles.push_back("AlbedoPositronsAlcarazMizuno");
-  
+
   return true;
 }
 
@@ -853,10 +1771,10 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
 {
   auto AlcarazDownward = [] (double EnergykeV) {
     double EnergyGeV = 0.000001*EnergykeV;
-    
+
     vector<double> Energies;
     vector<double> Fluxes;
-    
+
     // Extrapolated to lower energies
     Energies.push_back(0.001); Fluxes.push_back(1.07);
     Energies.push_back(0.002); Fluxes.push_back(0.7819);
@@ -884,15 +1802,15 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
     Energies.push_back(6.86); Fluxes.push_back(1.0E-05);
     Energies.push_back(8.60); Fluxes.push_back(2.0E-06);
     Energies.push_back(10.73); Fluxes.push_back(1.0E-07);
-    Energies.push_back(13.34);    
-    
+    Energies.push_back(13.34);
+
     for (unsigned int e = 0; e < Energies.size() - 1; ++e) {
-      Energies[e] = 0.5*(Energies[e] + Energies[e+1]); 
+      Energies[e] = 0.5*(Energies[e] + Energies[e+1]);
     }
     Energies.resize(Fluxes.size());
-    
+
     if (EnergyGeV < Energies[0] || EnergyGeV >= Energies.back()) return 0.0;
-    
+
     double Flux = 0.0;
     for (unsigned int e = 1; e < Energies.size()-1; ++e) {
       if (EnergyGeV < Energies[e]) {
@@ -904,16 +1822,16 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
         break;
       }
     }
-    
+
     return Flux/1000.0/10000.0;
   };
-  
+
   auto AlcarazUpward = [] (double EnergykeV) {
     double EnergyGeV = 0.000001*EnergykeV;
-    
+
     vector<double> Energies;
     vector<double> Fluxes;
-    
+
     // Extrapolated up
     Energies.push_back(0.001); Fluxes.push_back(2.52);
     Energies.push_back(0.002); Fluxes.push_back(1.62);
@@ -942,14 +1860,14 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
     Energies.push_back(8.60); Fluxes.push_back(2.0E-06);
     Energies.push_back(10.73); Fluxes.push_back(1.0E-07);
     Energies.push_back(13.34);
-        
+
     for (unsigned int e = 0; e < Energies.size() - 1; ++e) {
-      Energies[e] = 0.5*(Energies[e] + Energies[e+1]); 
+      Energies[e] = 0.5*(Energies[e] + Energies[e+1]);
     }
     Energies.resize(Fluxes.size());
-    
+
     if (EnergyGeV < Energies[0] || EnergyGeV >= Energies.back()) return 0.0;
-    
+
     double Flux = 0.0;
     for (unsigned int e = 1; e < Energies.size()-1; ++e) {
       if (EnergyGeV < Energies[e]) {
@@ -961,30 +1879,30 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
         break;
       }
     }
-    
+
     return Flux/1000.0/10000.0;
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
-  
+
   mout<<endl;
   mout<<"Generating an albedo proton spectrum according to Alcaraz..."<<endl;
 
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   vector<double> Spectrum;
   double Flux = 0;
   int Bins = 10000;
   double AngleFactor = 2*c_Pi * (cos(m_HorizonAngle*c_Rad) - (-1));
   MString Comments;
- 
-  
+
+
   // Downward component
-  
+
   Angle.clear();
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] <= 90) {
@@ -998,8 +1916,8 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(AlcarazDownward(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   Flux = 0;
   Bins = 10000;
@@ -1024,22 +1942,22 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
   Comments += "# Albedo proton spectrum downward component determinined after Alcaraz 2000\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Equatorial low-earth orbit \n";
-  Comments += "# * Angular distribution is flat \n";  
-  Comments += "# * Everything below 70 MeV is a wild guess extrapolation \n";  
-  
+  Comments += "# * Angular distribution is flat \n";
+  Comments += "# * Everything below 70 MeV is a wild guess extrapolation \n";
+
   WriteEnergyFile("AlbedoProtonAlcarazDownward", Spectrum);
   WriteAngleFile("AlbedoProtonAlcarazDownward", Angle);
   WriteSourceFile("AlbedoProtonAlcarazDownward", Flux, 4, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("AlbedoProtonAlcarazDownward");
-  
-  
-  // Upward component 
-  
+
+
+  // Upward component
+
   Angle.clear();
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
-    if (m_AngleBins[b] >= 90) { 
-      
+    if (m_AngleBins[b] >= 90) {
+
       Angle.push_back(1.0);
     } else {
       Angle.push_back(0.0);
@@ -1050,8 +1968,8 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(AlcarazUpward(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   Flux = 0;
   Bins = 10000;
@@ -1076,14 +1994,14 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAlcaraz()
   Comments += "# Albedo proton spectrum upward component determinined after Alcaraz 2000\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Equatorial low-earth orbit \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
   WriteEnergyFile("AlbedoProtonAlcarazUpward", Spectrum);
   WriteAngleFile("AlbedoProtonAlcarazUpward", Angle);
   WriteSourceFile("AlbedoProtonAlcarazUpward", Flux, 4, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("AlbedoProtonAlcarazUpward");
-  
+
   return true;
 }
 
@@ -1096,10 +2014,10 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
 {
   auto AlcarazDownward = [] (double EnergykeV) {
     double EnergyGeV = 0.000001*EnergykeV;
-    
+
     vector<double> Energies;
     vector<double> Fluxes;
-    
+
     // Extrapolated to lower energies from last two values
     Energies.push_back(0.001); Fluxes.push_back(7.753);
     Energies.push_back(0.002); Fluxes.push_back(4.15);
@@ -1127,21 +2045,21 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
     Energies.push_back(6.86); Fluxes.push_back(1.0E-05);
     Energies.push_back(8.60); Fluxes.push_back(2.0E-06);
     Energies.push_back(10.73); Fluxes.push_back(1.0E-07);
-    Energies.push_back(13.34);    
-    
+    Energies.push_back(13.34);
+
     // Re-extrapolate down:
     double Gradient = (log10(Fluxes[7]) - log10(Fluxes[6])) / (log10(Energies[7]) - log10(Energies[6]));
     for (unsigned int i = 5; i <= 5; --i) {
       Fluxes[i] = pow(10, log10(Fluxes[i+1]) - Gradient*(log10(Energies[i+1]) - log10(Energies[i])));
     }
-    
+
     for (unsigned int e = 0; e < Energies.size() - 1; ++e) {
-      Energies[e] = 0.5*(Energies[e] + Energies[e+1]); 
+      Energies[e] = 0.5*(Energies[e] + Energies[e+1]);
     }
     Energies.resize(Fluxes.size());
-    
+
     if (EnergyGeV < Energies[0] || EnergyGeV >= Energies.back()) return 0.0;
-    
+
     double Flux = 0.0;
     for (unsigned int e = 1; e < Energies.size()-1; ++e) {
       if (EnergyGeV < Energies[e]) {
@@ -1153,16 +2071,16 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
         break;
       }
     }
-    
+
     return Flux/1000.0/10000.0; // return Flux in p/cm2/s/sr/keV
   };
-  
+
   auto AlcarazUpward = [] (double EnergykeV) {
     double EnergyGeV = 0.000001*EnergykeV;
-    
+
     vector<double> Energies;
     vector<double> Fluxes;
-    
+
     // Extrapolated up
     Energies.push_back(0.001); Fluxes.push_back(21.29);
     Energies.push_back(0.002); Fluxes.push_back(9.62);
@@ -1191,20 +2109,20 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
     Energies.push_back(8.60); Fluxes.push_back(2.0E-06);
     Energies.push_back(10.73); Fluxes.push_back(1.0E-07);
     Energies.push_back(13.34);
-    
+
     // Re-extrapolate down:
     double Gradient = (log10(Fluxes[7]) - log10(Fluxes[6])) / (log10(Energies[7]) - log10(Energies[6]));
     for (unsigned int i = 5; i <= 5; --i) {
       Fluxes[i] = pow(10, log10(Fluxes[i+1]) - Gradient*(log10(Energies[i+1]) - log10(Energies[i])));
     }
-    
+
     for (unsigned int e = 0; e < Energies.size() - 1; ++e) {
-      Energies[e] = 0.5*(Energies[e] + Energies[e+1]); 
+      Energies[e] = 0.5*(Energies[e] + Energies[e+1]);
     }
     Energies.resize(Fluxes.size());
-    
+
     if (EnergyGeV < Energies[0] || EnergyGeV >= Energies.back()) return 0.0;
-    
+
     double Flux = 0.0;
     for (unsigned int e = 1; e < Energies.size()-1; ++e) {
       if (EnergyGeV < Energies[e]) {
@@ -1216,28 +2134,28 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
         break;
       }
     }
-    
+
     return Flux/1000.0/10000.0; // return Flux in p/cm2/s/sr/keV
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
-  
+
   mout<<endl;
   mout<<"Generating an albedo proton spectrum according to Alcaraz..."<<endl;
 
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   vector<double> Spectrum;
   double Flux = 0;
   int Bins = 10000;
- 
-  
+
+
   // Upward and Downward component combined
-  
+
   Angle.clear();
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     Angle.push_back(1.0);
@@ -1247,8 +2165,8 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(0.5*(AlcarazUpward(m_EnergyBins[b]) + AlcarazDownward(m_EnergyBins[b])) );
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2/sr via numerical integration...
   Flux = 0;
   Bins = 10000;
@@ -1275,14 +2193,14 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
   Comments += "# Albedo proton spectrum upward and downward component combined and averaged determinined after Alcaraz 2000\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Equatorial low-earth orbit \n";
-  Comments += "# * Angular distribution is isotropic \n";  
-  Comments += "# * Alcaraz's data goes from 70 MeV to 5 GeV. Below that we extrapolate from gradient from last data point.\n";  
-  Comments += "# * We arbitrarily cut a 1 MeV .\n";  
-  
+  Comments += "# * Angular distribution is isotropic \n";
+  Comments += "# * Alcaraz's data goes from 70 MeV to 5 GeV. Below that we extrapolate from gradient from last data point.\n";
+  Comments += "# * We arbitrarily cut a 1 MeV .\n";
+
   WriteEnergyFile("AlbedoProtonAlcaraz", Spectrum);
   WriteAngleFile("AlbedoProtonAlcaraz", Angle);
   WriteSourceFile("AlbedoProtonAlcaraz", Flux, 4, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("AlbedoProtonAlcaraz");
 
   return true;
@@ -1296,51 +2214,51 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedAlcaraz()
 bool BackgroundGenerator::GenerateAlbedoProtonsAveragedMizuno()
 {
   // 0.0 ≤ θM ≤ 0.2 down/upward cutoff PL 0.136/0.123/0.155/0.51  F0 /F1 /a/Ec (GeV) f
-  
+
   auto MizunoAveraged = [] (double EnergykeV) {
     double EnergyMeV = 0.001*EnergykeV;
-    
+
     if (EnergyMeV < 1) return 0.0;
-    
+
     double Flux = 0.0;
     if (EnergyMeV > 100) {
       Flux = 0.123*pow(EnergyMeV/1000, -0.155) * exp(-pow(EnergyMeV/511, -0.155+1)); // p/m2/s/sr/MeV
     } else {
       Flux = 0.136*pow(EnergyMeV/100, -1);
     }
-    
-    return Flux/1000.0/10000.0; // return Flux in p/cm2/s/sr/keV
+
+    return 2*Flux/1000.0/10000.0; // return Flux in p/cm2/s/sr/keV Factor 2 to consider upward and downward component
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
-  
+
   mout<<endl;
   mout<<"Generating an albedo proton spectrum according to Mizuno..."<<endl;
-  
+
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   vector<double> Spectrum;
   double Flux = 0;
   int Bins = 10000;
-  
-  
+
+
   // Upward and Downward component combined
-  
+
   Angle.clear();
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     Angle.push_back(1.0);
   }
-  
+
   Spectrum.clear();
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(MizunoAveraged(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2/sr via numerical integration...
   Flux = 0;
   Bins = 10000;
@@ -1354,26 +2272,26 @@ bool BackgroundGenerator::GenerateAlbedoProtonsAveragedMizuno()
     Flux += Average*(EMax-EMin);
   }
   cout<<"Flux: "<<Flux<<" ph/cm2/s/sr"<<endl;
-  
+
   // Integration factor over full sphere
   double AngleFactor = 4*c_Pi;
   cout<<"Angle-factor: "<<AngleFactor<<endl;
   Flux *= AngleFactor;
   cout<<"Flux: "<<Flux<<" ph/cm2/s"<<endl;
-  
+
   MString Comments;
   Comments = "";
   Comments += "# Albedo proton spectrum upward and downward component combined and averaged determinined after Mizuno 2004\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Equatorial low-earth orbit \n";
-  Comments += "# * Angular distribution is isotropic \n";  
-  
+  Comments += "# * Angular distribution is isotropic \n";
+
   WriteEnergyFile("AlbedoProtonMizuno", Spectrum);
   WriteAngleFile("AlbedoProtonMizuno", Angle);
   WriteSourceFile("AlbedoProtonMizuno", Flux, 4, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("AlbedoProtonMizuno");
-  
+
   return true;
 }
 
@@ -1389,14 +2307,14 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
     double M = 1.0;
     double b = 0.00255;
     double alpha = 0.152;
-    
+
     double Flux = 0.0;
     if (EnergyMeV < 70) {
       Flux = 0.036*M*(1-b*Angle)*exp(-alpha*m_AverageGeomagneticCutOff)*pow(EnergyMeV, -0.6);
     } else {
       Flux = 8.7*M*(1-b*Angle)*exp(-alpha*m_AverageGeomagneticCutOff)*pow(EnergyMeV, -1.89);
     }
-    
+
     return Flux / 1000.0; // Switch from n/MeV/cm2/s to n/keV/cm2/s
   };
 
@@ -1404,9 +2322,9 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
     double Pressure = 0;
     double MagLat = m_Inclination; // Orig: 10
     double SolarActivity = 0.5; // Solar Minimum (0), Solar Maximum (1)
-    
+
     double a = 0.0003 + (7.0-5.0*SolarActivity)*0.001*(1-tanh(c_Rad*(180-4.0*MagLat)));
-    double b = 0.0140 + (1.4-0.9*SolarActivity)*  0.1*(1-tanh(c_Rad*(180-3.5*MagLat))); 
+    double b = 0.0140 + (1.4-0.9*SolarActivity)*  0.1*(1-tanh(c_Rad*(180-3.5*MagLat)));
     double c = 180 -                             42*(1-tanh(c_Rad*(180-5.5*MagLat)));
     double d = -0.008 + (6.0-1.0*SolarActivity)*0.001*(1-tanh(c_Rad*(180-4.4*MagLat)));
 
@@ -1418,7 +2336,7 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
     double Norm3 = Norm2*pow(15, -Slope2+Slope3);
     double Slope4 = -0.46 * exp(-Pressure/100.0) + 2.53;
     double Norm4 = Norm3*pow(70, -Slope3+Slope4);
-    
+
     double Flux = 0.0;
     if (EnergyMeV < 0.9) {
       Flux = Norm1 * pow(EnergyMeV, -Slope1);
@@ -1427,12 +2345,12 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
     } else if (EnergyMeV >= 15 && EnergyMeV < 70) {
       Flux = Norm3 * pow(EnergyMeV, -Slope3);
     } else if (EnergyMeV >= 70) {
-      Flux = Norm4 * pow(EnergyMeV, -Slope4);    
+      Flux = Norm4 * pow(EnergyMeV, -Slope4);
     }
-      
+
     return Flux / 1000.0; // Switch from n/MeV/cm2/s to n/keV/cm2/s
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
 
   mout<<endl;
@@ -1441,8 +2359,8 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -1454,18 +2372,18 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
   // Integration factor over sphere
   double AngleFactor = 2*c_Pi * (cos(m_HorizonAngle*c_Rad) - (-1));
   cout<<"Angle-factor: "<<AngleFactor<<endl;
-  
+
   cout<<"Scaler: "<<Morris(150)/Kole(150)<<endl;
   double Scaler = 1.0; //Morris(150)/Kole(150);
   cout<<"Normalization at 30 MeV: Morris: "<<Morris(30)<<" vs. Kole "<<Kole(30)<<endl;
   cout<<"Normalization at 150 MeV: Morris: "<<Morris(150)<<" vs. Kole "<<Kole(150)<<endl;
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(Kole(m_EnergyBins[b]/1000)*Scaler/AngleFactor); // We need the angle factor here to switch from ph/cm2/s/keV to ph/cm2/s/keV/sr
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -1487,16 +2405,16 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
   Comments += "# Albedo neutrons determinined after Morris 1995 & Kole 2014\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Use the Morris absolute flux value @ 150 MeV and the shape of Kole \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";
   Comments += "# * Solar activity is assumed to be half way between solar minimum and maximum \n";
   Comments += "# * The inclination was used to approximate the average Magnetic Latitude \n";
-  
+
   WriteEnergyFile("AlbedoNeutronsMorrisKole", Spectrum);
   WriteAngleFile("AlbedoNeutronsMorrisKole", Angle);
   WriteSourceFile("AlbedoNeutronsMorrisKole", Flux, 6, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("AlbedoNeutronsMorrisKole");
-  
+
   return true;
 }
 
@@ -1506,17 +2424,17 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsMorrisKole()
  */
 bool BackgroundGenerator::GenerateAlbedoNeutronsKole()
 {
-  
+
   auto Kole = [this] (double EnergyMeV) {
     double Pressure = 0;
     double MagLat = m_Inclination; // Orig: 10
     double SolarActivity = 0.5; // Solar Minimum (0), Solar Maximum (1)
-    
+
     double a = 0.0003 + (7.0-5.0*SolarActivity)*0.001*(1-tanh(c_Rad*(180-4.0*MagLat)));
-    double b = 0.0140 + (1.4-0.9*SolarActivity)*  0.1*(1-tanh(c_Rad*(180-3.5*MagLat))); 
+    double b = 0.0140 + (1.4-0.9*SolarActivity)*  0.1*(1-tanh(c_Rad*(180-3.5*MagLat)));
     double c = 180 -                             42*(1-tanh(c_Rad*(180-5.5*MagLat)));
     double d = -0.008 + (6.0-1.0*SolarActivity)*0.001*(1-tanh(c_Rad*(180-4.4*MagLat)));
-    
+
     double Slope1 = -0.29 * exp(-Pressure/7.5) + 0.735;
     double Norm1 = (a*Pressure + b)*exp(-Pressure/c) + d;
     double Slope2 = -0.247 * exp(-Pressure/36.5) + 1.4;
@@ -1525,7 +2443,7 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsKole()
     double Norm3 = Norm2*pow(15, -Slope2+Slope3);
     double Slope4 = -0.46 * exp(-Pressure/100.0) + 2.53;
     double Norm4 = Norm3*pow(70, -Slope3+Slope4);
-    
+
     double Flux = 0.0;
     if (EnergyMeV < 0.9) {
       Flux = Norm1 * pow(EnergyMeV, -Slope1);
@@ -1534,22 +2452,22 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsKole()
     } else if (EnergyMeV >= 15 && EnergyMeV < 70) {
       Flux = Norm3 * pow(EnergyMeV, -Slope3);
     } else if (EnergyMeV >= 70) {
-      Flux = Norm4 * pow(EnergyMeV, -Slope4);    
+      Flux = Norm4 * pow(EnergyMeV, -Slope4);
     }
-    
+
     return Flux / 1000.0; // Switch from n/MeV/cm2/s to n/keV/cm2/s
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
-  
+
   mout<<endl;
   mout<<"Generating an albedo neutron spectrum according to Morris and Kole..."<<endl;
-  
+
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -1560,13 +2478,13 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsKole()
   }
   // Integration factor over sphere
   double AngleFactor = 2*c_Pi * (cos(m_HorizonAngle*c_Rad) - (-1));
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(Kole(m_EnergyBins[b]/1000)/AngleFactor); // We need the angle factor here to switch from ph/cm2/s/keV to ph/cm2/s/keV/sr
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -1579,20 +2497,20 @@ bool BackgroundGenerator::GenerateAlbedoNeutronsKole()
     double Average = 0.5*(Kole(EMin/1000) + Kole(EMax/1000));
     Flux += Average*(EMax-EMin);
   }
-  
+
   MString Comments;
   Comments += "# Albedo neutrons determinined after Kole+ 2014\n";
   Comments += "# Assumptions: \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon (no limb brightening!) \n";
   Comments += "# * Solar activity is assumed to be half way between solar minimum and maximum \n";
   Comments += "# * The inclination was used to approximate the average Magnetic Latitude \n";
-  
+
   WriteEnergyFile("AlbedoNeutronsKole", Spectrum);
   WriteAngleFile("AlbedoNeutronsKole", Angle);
   WriteSourceFile("AlbedoNeutronsKole", Flux, 6, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("AlbedoNeutronsKole");
-  
+
   return true;
 }
 
@@ -1611,25 +2529,25 @@ bool BackgroundGenerator::GenerateCosmicPhotonGruber()
 
   auto Gruber = [this] (double EnergykeV) {
     double Flux = 0.0;
-    if (EnergykeV < 60) { 
+    if (EnergykeV < 60) {
       Flux = 7.877*pow(EnergykeV, -1.29)*exp(-EnergykeV/41.13);
     } else {
-      Flux = 0.0259*pow(60, 5.5)*pow(EnergykeV, -6.5) + 
-             0.504*pow(60, 1.58)*pow(EnergykeV, -2.58) + 
+      Flux = 0.0259*pow(60, 5.5)*pow(EnergykeV, -6.5) +
+             0.504*pow(60, 1.58)*pow(EnergykeV, -2.58) +
              0.0288*pow(60, 1.05)*pow(EnergykeV, -2.05);
     }
     return Flux;
   };
-  
-  
+
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     // Gruber 1999, Formula (1) in ph/cm2/s/sr/keV
-    if (m_EnergyBins[b] < 60) { 
+    if (m_EnergyBins[b] < 60) {
       Spectrum.push_back(7.877*pow(m_EnergyBins[b], -1.29)*exp(-m_EnergyBins[b]/41.13));
     } else {
-      Spectrum.push_back(0.0259*pow(60, 5.5)*pow(m_EnergyBins[b], -6.5) + 
-                         0.504*pow(60, 1.58)*pow(m_EnergyBins[b], -2.58) + 
+      Spectrum.push_back(0.0259*pow(60, 5.5)*pow(m_EnergyBins[b], -6.5) +
+                         0.504*pow(60, 1.58)*pow(m_EnergyBins[b], -2.58) +
                         0.0288*pow(60, 1.05)*pow(m_EnergyBins[b], -2.05));
     }
   }
@@ -1654,7 +2572,7 @@ bool BackgroundGenerator::GenerateCosmicPhotonGruber()
     // We need to perform a numerical integration...
     int Bins = 10000;
     double Dist = (m_EnergyMax-m_EnergyMin)/Bins;
-    
+
     // We have fine enough binning that this approach is ok:
     for (double e = 0; e <= Bins-1; ++e) {
       double EMin = m_EnergyMin + e*Dist;
@@ -1671,7 +2589,7 @@ bool BackgroundGenerator::GenerateCosmicPhotonGruber()
     // We need to perform a numerical integration...
     int Bins = 10000;
     double Dist = (60-m_EnergyMin)/Bins;
-    
+
     // We have fine enough binning that this approach is ok:
     for (double e = 0; e <= Bins-1; ++e) {
       double EMin = m_EnergyMin + e*Dist;
@@ -1679,7 +2597,7 @@ bool BackgroundGenerator::GenerateCosmicPhotonGruber()
       double Average = 0.5*(7.877*pow(EMin, -1.29)*exp(-EMin/41.13) + 7.877*pow(EMax, -1.29)*exp(-EMax/41.13));
       Flux += Average*(EMax-EMin);
     }
-    
+
     Flux += 0.0259/(pow(60, -5.5)*(-6.5 + 1)) * (pow(m_EnergyMax, -5.5) - pow(60, -5.5));
     Flux += 0.504/(pow(60, -1.58)*(-2.58 + 1)) * (pow(m_EnergyMax, -1.58) - pow(60, -1.58));
     Flux += 0.0288/(pow(60, -1.05)*(-2.05 + 1)) * (pow(m_EnergyMax, -1.05) - pow(60, -1.05));
@@ -1689,18 +2607,18 @@ bool BackgroundGenerator::GenerateCosmicPhotonGruber()
   Flux *= AngleFactor;
   cout<<"Average flux: "<<Flux<<" ph/cm2/s"<<endl;
 
-  
-  
-  
+
+
+
   WriteEnergyFile("CosmicPhotonsGruber", Spectrum);
   WriteAngleFile("CosmicPhotonsGruber", Angle);
   WriteSourceFile("CosmicPhotonsGruber", Flux, 1);
-  
+
   m_PhotonicSummaryFiles.push_back("CosmicPhotonsGruber");
-  
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux2 = 0;
-  int Bins = 10000; 
+  int Bins = 10000;
   double Min = log(m_EnergyMin);
   double Max = log(m_EnergyMax);
   double Dist = (Max-Min)/Bins;
@@ -1715,7 +2633,7 @@ bool BackgroundGenerator::GenerateCosmicPhotonGruber()
   cout<<"Flux sanity check: "<<Flux2<<" ph/cm2/s/sr"<<endl;
   Flux2 *= AngleFactor;
   cout<<"Flux sanity check:: "<<Flux2<<" ph/cm2/s"<<endl;
-    
+
   return true;
 }
 
@@ -1728,20 +2646,20 @@ bool BackgroundGenerator::GenerateCosmicElectronsMizuno()
   auto Mizuno = [this] (double EnergykeV) {
     double A = 0.65; // counts / s / m2 / sr / MeV
     double Index = 3.3;
-    
+
     double EnergyGeV = 0.000001*EnergykeV;
-    
+
     double Rigidity = sqrt(EnergyGeV*EnergyGeV + 2*EnergyGeV*0.000511); // GV!
-    
+
     // The unmodulated flux:
     double Flux = A*pow(Rigidity, -Index); // Formulas (1) & (13) in Mizuno are for a rigidity in GV
-    
+
     // The flux due to geomagnetic cut-off:
     Flux *= 1.0 / (1.0 + pow(Rigidity/m_AverageGeomagneticCutOff, -6));
-    
+
     return Flux / 1000.0 / 10000.0; // Switch from n/MeV/m2/s to n/keV/cm2/s
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
 
   mout<<endl;
@@ -1750,8 +2668,8 @@ bool BackgroundGenerator::GenerateCosmicElectronsMizuno()
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -1760,13 +2678,13 @@ bool BackgroundGenerator::GenerateCosmicElectronsMizuno()
       Angle.push_back(0.0);
     }
   }
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(Mizuno(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -1791,14 +2709,14 @@ bool BackgroundGenerator::GenerateCosmicElectronsMizuno()
   Comments += "# Cosmic electrons after Mizuno 2004\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Solar modulation has been ignored! \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
   WriteEnergyFile("CosmicElectronsMizuno", Spectrum);
   WriteAngleFile("CosmicElectronsMizuno", Angle);
   WriteSourceFile("CosmicElectronsMizuno", Flux, 3, Comments);
-  
+
   m_LeptonicSummaryFiles.push_back("CosmicElectronsMizuno");
-  
+
   return true;
 }
 
@@ -1811,20 +2729,20 @@ bool BackgroundGenerator::GenerateCosmicPositronsMizuno()
   auto Mizuno = [this] (double EnergykeV) {
     double A = 0.055; // counts / s / m2 / sr / MeV
     double Index = 3.3;
-    
+
     double EnergyGeV = 0.000001*EnergykeV;
-    
+
     double Rigidity = sqrt(EnergyGeV*EnergyGeV + 2*EnergyGeV*0.000511); // GV!
-    
+
     // The unmodulated flux:
     double Flux = A*pow(Rigidity, -Index); // Formulas (1) & (13) in Mizuno are for a rigidity in GV
-    
+
     // The flux due to geomagnetic cut-off:
     Flux *= 1.0 / (1.0 + pow(Rigidity/m_AverageGeomagneticCutOff, -6));
-    
+
     return Flux / 1000.0 / 10000.0; // Switch from n/MeV/m2/s to n/keV/cm2/s
   };
-  
+
   if (m_IsEarthOrbit == false) return true;
 
   mout<<endl;
@@ -1833,8 +2751,8 @@ bool BackgroundGenerator::GenerateCosmicPositronsMizuno()
   if (IsValid(1, 1000000000) == false) {
     return false;
   }
-  
-  
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] >= m_HorizonAngle) {
@@ -1843,13 +2761,13 @@ bool BackgroundGenerator::GenerateCosmicPositronsMizuno()
       Angle.push_back(0.0);
     }
   }
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(Mizuno(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -1874,14 +2792,14 @@ bool BackgroundGenerator::GenerateCosmicPositronsMizuno()
   Comments += "# Cosmic positrons after Mizuno 2004\n";
   Comments += "# Assumptions: \n";
   Comments += "# * Solar modulation has been ignored! \n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
   WriteEnergyFile("CosmicPositronsMizuno", Spectrum);
   WriteAngleFile("CosmicPositronsMizuno", Angle);
   WriteSourceFile("CosmicPositronsMizuno", Flux, 2, Comments);
-  
+
   m_LeptonicSummaryFiles.push_back("CosmicPositronsMizuno");
-  
+
   return true;
 }
 
@@ -1901,13 +2819,13 @@ bool BackgroundGenerator::GenerateCosmicProtonsSpenvis()
   ifstream in;
   in.open(m_AverageCosmicProtonsSpenvis);
   if (in.is_open() == false) {
-    mout<<"Error: Unable to open file "<<m_AverageCosmicProtonsSpenvis<<endl; 
+    mout<<"Error: Unable to open file "<<m_AverageCosmicProtonsSpenvis<<endl;
     return false;
   }
-  
+
   vector<double> Energies;
   vector<double> Fluxes;
-  
+
   MString Line;
   bool Start = false;
   while (in.good() == true) {
@@ -1928,16 +2846,16 @@ bool BackgroundGenerator::GenerateCosmicProtonsSpenvis()
       Fluxes.push_back(Flux);
     }
   }
-  
+
   /*
   cout<<"Data: "<<endl;
   for (unsigned int e = 0; e < Energies.size(); ++e) {
-    cout<<Energies[e]<<":"<<Fluxes[e]<<endl; 
+    cout<<Energies[e]<<":"<<Fluxes[e]<<endl;
   }
   */
-  
+
   auto Spenvis = [Energies, Fluxes] (double EnergykeV) {
-    
+
     double Flux = 0.0;
     if (EnergykeV < Energies[0]) {
       double m = (log(Fluxes[1]) - log(Fluxes[0]))/(log(Energies[1]) - log(Energies[0]));
@@ -1961,12 +2879,12 @@ bool BackgroundGenerator::GenerateCosmicProtonsSpenvis()
         }
       }
     }
-    
+
     return Flux;
   };
-  
-  
-  
+
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] <= m_HorizonAngle) {
@@ -1975,13 +2893,13 @@ bool BackgroundGenerator::GenerateCosmicProtonsSpenvis()
       Angle.push_back(0.0);
     }
   }
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(Spenvis(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -2006,14 +2924,14 @@ bool BackgroundGenerator::GenerateCosmicProtonsSpenvis()
   Comments += "# Cosmic protons using SPENVIS\n";
   Comments += "# Assumptions: \n";
   Comments += "# * log-log extrapolation beyond upper energy limit from SPENVIS\n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
   WriteEnergyFile("CosmicProtonsSpenvis", Spectrum);
   WriteAngleFile("CosmicProtonsSpenvis", Angle);
   WriteSourceFile("CosmicProtonsSpenvis", Flux, 4, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("CosmicProtonsSpenvis");
-  
+
   return true;
 }
 
@@ -2033,13 +2951,13 @@ bool BackgroundGenerator::GenerateCosmicAlphasSpenvis()
   ifstream in;
   in.open(m_AverageCosmicAlphasSpenvis);
   if (in.is_open() == false) {
-    mout<<"Error: Unable to open file "<<m_AverageCosmicAlphasSpenvis<<endl; 
+    mout<<"Error: Unable to open file "<<m_AverageCosmicAlphasSpenvis<<endl;
     return false;
   }
-  
+
   vector<double> Energies;
   vector<double> Fluxes;
-  
+
   MString Line;
   bool Start = false;
   while (in.good() == true) {
@@ -2065,16 +2983,16 @@ bool BackgroundGenerator::GenerateCosmicAlphasSpenvis()
       Fluxes.push_back(Flux);
     }
   }
-  
+
   /*
   cout<<"Data: "<<endl;
   for (unsigned int e = 0; e < Energies.size(); ++e) {
-    cout<<Energies[e]<<":"<<Fluxes[e]<<endl; 
+    cout<<Energies[e]<<":"<<Fluxes[e]<<endl;
   }
   */
-  
+
   auto Spenvis = [Energies, Fluxes] (double EnergykeV) {
-    
+
     double Flux = 0.0;
     if (EnergykeV < Energies[0]) {
       double m = (log(Fluxes[1]) - log(Fluxes[0]))/(log(Energies[1]) - log(Energies[0]));
@@ -2098,12 +3016,12 @@ bool BackgroundGenerator::GenerateCosmicAlphasSpenvis()
         }
       }
     }
-    
+
     return Flux; // p/cm2/s/keV/(MeV/n)  <-- switching from MeV/n to MeV in energy dimension does not change flux since we just change scale on x-axis!
   };
-  
-  
-  
+
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     if (m_AngleBins[b] <= m_HorizonAngle) {
@@ -2112,13 +3030,13 @@ bool BackgroundGenerator::GenerateCosmicAlphasSpenvis()
       Angle.push_back(0.0);
     }
   }
-  
+
   vector<double> Spectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     Spectrum.push_back(Spenvis(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double Flux = 0;
   int Bins = 10000;
@@ -2143,14 +3061,14 @@ bool BackgroundGenerator::GenerateCosmicAlphasSpenvis()
   Comments += "# Cosmic alpha particles using SPENVIS\n";
   Comments += "# Assumptions: \n";
   Comments += "# * log-log extrapolation beyond upper energy limit from SPENVIS\n";
-  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";  
-  
+  Comments += "# * Angular distribution is flat out to the Earth-horizon \n";
+
   WriteEnergyFile("CosmicAlphasSpenvis", Spectrum);
   WriteAngleFile("CosmicAlphasSpenvis", Angle);
   WriteSourceFile("CosmicAlphasSpenvis", Flux, 21, Comments);
-  
+
   m_HadronicSummaryFiles.push_back("CosmicAlphasSpenvis");
-  
+
   return true;
 }
 
@@ -2170,16 +3088,16 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
   ifstream in;
   in.open(m_AverageTrappedProtonsElectronsSpenvis);
   if (in.is_open() == false) {
-    mout<<"Error: Unable to open file "<<m_AverageTrappedProtonsElectronsSpenvis<<endl; 
+    mout<<"Error: Unable to open file "<<m_AverageTrappedProtonsElectronsSpenvis<<endl;
     return false;
   }
-  
+
   vector<double> ProtonEnergies;
   vector<double> ProtonFluxes;
-  
+
   vector<double> ElectronEnergies;
   vector<double> ElectronFluxes;
-  
+
   MString Line;
   bool IsProtons = true;
   bool Start = false;
@@ -2202,7 +3120,7 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
       cout<<Line<<endl;
       continue;
     }
-    double Energy = 1000*atof(Tokens[0]); // 
+    double Energy = 1000*atof(Tokens[0]); //
     double Flux = atof(Tokens[2])/1000/4/c_Pi; // <-- Assuming 4 pi
     if (Flux > 0) {
       //cout<<Line<<endl;
@@ -2215,23 +3133,23 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
       }
     }
   }
-  
+
   /*
   cout<<"Data protons: "<<endl;
   for (unsigned int e = 0; e < ProtonEnergies.size(); ++e) {
-    cout<<ProtonEnergies[e]<<":"<<ProtonFluxes[e]<<endl; 
+    cout<<ProtonEnergies[e]<<":"<<ProtonFluxes[e]<<endl;
   }
-  
+
   cout<<"Data electrons: "<<endl;
   for (unsigned int e = 0; e < ElectronEnergies.size(); ++e) {
-    cout<<ElectronEnergies[e]<<":"<<ElectronFluxes[e]<<endl; 
+    cout<<ElectronEnergies[e]<<":"<<ElectronFluxes[e]<<endl;
   }
   */
-  
+
   auto ProtonsSpenvis = [ProtonEnergies, ProtonFluxes] (double EnergykeV) {
-    
+
     if (ProtonEnergies.size() < 2) return 0.0;
-    
+
     double Flux = 0.0;
     if (EnergykeV < ProtonEnergies[0]) {
       double m = (log(ProtonFluxes[1]) - log(ProtonFluxes[0]))/(log(ProtonEnergies[1]) - log(ProtonEnergies[0]));
@@ -2255,14 +3173,14 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
         }
       }
     }
-    
+
     return Flux; // p/cm2/s/keV/sr
   };
-  
+
   auto ElectronsSpenvis = [ElectronEnergies, ElectronFluxes] (double EnergykeV) {
-    
+
     if (ElectronEnergies.size() < 2) return 0.0;
-    
+
     double Flux = 0.0;
     if (EnergykeV < ElectronEnergies[0]) {
       double m = (log(ElectronFluxes[1]) - log(ElectronFluxes[0]))/(log(ElectronEnergies[1]) - log(ElectronEnergies[0]));
@@ -2286,19 +3204,19 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
         }
       }
     }
-    
+
     return Flux; // p/cm2/s/keV/sr
   };
-  
-  
-  
+
+
+
   vector<double> Angle;
   for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
     Angle.push_back(1.0);
   }
   // Integration factor over sphere
   double AngleFactor = 4*c_Pi;
-  
+
   vector<double> ProtonSpectrum;
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     ProtonSpectrum.push_back(ProtonsSpenvis(m_EnergyBins[b]));
@@ -2307,8 +3225,8 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
   for (unsigned int b = 0; b < m_NEnergyBins; ++b) {
     ElectronSpectrum.push_back(ElectronsSpenvis(m_EnergyBins[b]));
   }
-  
-  
+
+
   // Determine the flux in ph/s/cm2 via numerical integration...
   double ProtonFlux = 0;
   double ElectronFlux = 0;
@@ -2336,28 +3254,28 @@ bool BackgroundGenerator::GenerateTrappedProtonsElectronsSpenvis()
   MString Comments;
   Comments += "# Trapped protons particles using SPENVIS\n";
   Comments += "# Assumptions: \n";
-  Comments += "# * The values are orbit averaged - thus do NOT simulate alongside other hadrons: \n";  
-  Comments += "#   Since we are OFF during SAA passages, do a separate simulation of the trapped protons \n";  
-  Comments += "#   and then just include the activations not the prompt decays for normal background calculations. \n";  
-  Comments += "# * Angular distribution is assumed isotropic \n";  
-  
+  Comments += "# * The values are orbit averaged - thus do NOT simulate alongside other hadrons: \n";
+  Comments += "#   Since we are OFF during SAA passages, do a separate simulation of the trapped protons \n";
+  Comments += "#   and then just include the activations not the prompt decays for normal background calculations. \n";
+  Comments += "# * Angular distribution is assumed isotropic \n";
+
   WriteEnergyFile("TrappedProtonsSpenvis", ProtonSpectrum);
   WriteAngleFile("TrappedProtonsSpenvis", Angle);
   WriteSourceFile("TrappedProtonsSpenvis", ProtonFlux, 4, Comments);
-  
+
   m_TrappedHadronicSummaryFiles.push_back("TrappedProtonsSpenvis");
 
   Comments = "";
   Comments += "# Trapped electron particles using SPENVIS\n";
   Comments += "# Assumptions: \n";
-  Comments += "# * The values are orbit averaged. \n";  
-  Comments += "# * DO NOT include in normal background calculations since we are OFF during SAA passages.\n";  
-  Comments += "# * Angular distribution is assumed isotropic \n";  
-  
+  Comments += "# * The values are orbit averaged. \n";
+  Comments += "# * DO NOT include in normal background calculations since we are OFF during SAA passages.\n";
+  Comments += "# * Angular distribution is assumed isotropic \n";
+
   WriteEnergyFile("TrappedElectronsSpenvis", ElectronSpectrum);
   WriteAngleFile("TrappedElectronsSpenvis", Angle);
   WriteSourceFile("TrappedElectronsSpenvis", ElectronFlux, 3, Comments);
-  
+
   return true;
 }
 
@@ -2387,14 +3305,14 @@ bool BackgroundGenerator::WriteEnergyFile(MString SourceName, vector<double> Spe
     for (unsigned int b = 0; b < m_EnergyBins.size(); ++b) {
       fout<<"DP "<<m_EnergyBins[b]<<" "<<Spectrum[b]<<endl;
     }
-    fout<<endl; 
+    fout<<endl;
   } else {
     fout.setf(ios_base::scientific, ios_base::floatfield);
     fout.precision(6);
     for (unsigned int b = 0; b < m_EnergyBins.size(); ++b) {
       fout<<" "<<setw(11)<<m_EnergyBins[b]/1000000<<"  "<<setw(11)<<Spectrum[b]*1000000*10000<<endl;
     }
-    fout<<endl;   
+    fout<<endl;
   }
 
   fout.close();
@@ -2423,14 +3341,14 @@ bool BackgroundGenerator::WriteAngleFile(MString SourceName, vector<double> Angl
     fout<<endl;
     fout<<"IP LIN"<<endl;
     fout<<endl;
-    
+
     for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
       fout<<"DP "<<m_AngleBins[b]<<" "<<Angle[b]<<endl;
     }
     fout<<endl;
   } else {
     fout.setf(ios_base::scientific, ios_base::floatfield);
-    fout.precision(6);    
+    fout.precision(6);
     for (unsigned int b = 0; b < m_AngleBins.size(); ++b) {
       fout<<" "<<setw(11)<<m_AngleBins[b]<<" "<<setw(11)<<Angle[b]<<endl;
     }
@@ -2450,13 +3368,13 @@ bool BackgroundGenerator::WriteSourceFile(MString SourceName, double Flux, int P
 {
   MString FileName = SourceName;
   FileName += ".partial.source";
-  
+
   MString EnergyFileName = SourceName;
   EnergyFileName += ".spectrum.dat";
-  
+
   MString AngleFileName = SourceName;
   AngleFileName += ".beam.dat";
-  
+
   ofstream fout;
   fout.open(FileName);
   if (fout.is_open() == false) {
@@ -2486,7 +3404,7 @@ bool BackgroundGenerator::WriteSourceFile(MString SourceName, double Flux, int P
     fout<<SourceName<<".Spectrum               File "<<EnergyFileName<<endl;
   }
   fout<<SourceName<<".Flux                   "<<Flux<<endl;
-  fout<<endl; 
+  fout<<endl;
   fout.close();
 
   return true;
@@ -2504,7 +3422,7 @@ bool BackgroundGenerator::WriteSummaryFiles()
     mout<<"Unable to open: Common.partial.source"<<endl;
     return false;
   }
-  
+
   fout<<"# Common setup option for all simulations"<<endl;
   fout<<endl;
   fout<<"# Version of the source file"<<endl;
@@ -2517,17 +3435,17 @@ bool BackgroundGenerator::WriteSummaryFiles()
   fout<<"# Output formats"<<endl;
   fout<<"StoreSimulationInfo  init-only"<<endl;
   fout<<endl;
-  
+
   fout.close();
-  
-  
+
+
   ofstream pout;
   pout.open("PhotonicComponents.source");
   if (pout.is_open() == false) {
     mout<<"Unable to open: PhotonicComponents.source"<<endl;
     return false;
   }
-  
+
   pout<<"# Components file for the photon simulations"<<endl;
   pout<<endl;
   pout<<"Include Common.partial.source"<<endl;
@@ -2546,15 +3464,15 @@ bool BackgroundGenerator::WriteSummaryFiles()
   pout<<endl;
 
   pout.close();
-  
-  
+
+
   ofstream lout;
   lout.open("LeptonicComponents.source");
   if (lout.is_open() == false) {
     mout<<"Unable to open: LeptonicComponents.source"<<endl;
     return false;
   }
-  
+
   lout<<"# Components file for the lepton simulations"<<endl;
   lout<<endl;
   lout<<"Include Common.partial.source"<<endl;
@@ -2573,18 +3491,18 @@ bool BackgroundGenerator::WriteSummaryFiles()
     lout<<"Include "<<S<<".partial.source"<<endl;
   }
   lout<<endl;
-  
+
   lout.close();
-  
-  
-  
+
+
+
   ofstream hiout;
   hiout.open("HadronicComponentsPrompt.source");
   if (hiout.is_open() == false) {
     mout<<"Unable to open: HadronicComponentsPrompt.source"<<endl;
     return false;
-  }  
-  
+  }
+
   hiout<<"# Components file for the hadron simulations - prompt"<<endl;
   hiout<<endl;
   hiout<<"Include Common.partial.source"<<endl;
@@ -2605,18 +3523,18 @@ bool BackgroundGenerator::WriteSummaryFiles()
     hiout<<"Include "<<S<<".partial.source"<<endl;
   }
   hiout<<endl;
-  
+
   hiout.close();
-  
-  
-  
+
+
+
   ofstream hbout;
   hbout.open("HadronicComponentsBuildUp.source");
   if (hbout.is_open() == false) {
     mout<<"Unable to open: HadronicComponentsBuildUp.source"<<endl;
     return false;
-  }  
-  
+  }
+
   hbout<<"# Components file for the hadron simulations - build up"<<endl;
   hbout<<endl;
   hbout<<"Include Common.partial.source"<<endl;
@@ -2635,18 +3553,18 @@ bool BackgroundGenerator::WriteSummaryFiles()
   hbout<<"# User > for i in `ls HadronicBackgroundIsotopes.p1.inc*.dat`; do echo \"A.IsotopeProductionFile $i\" >> HadronicBackgroundIsotopes.source; done"<<endl;
   hbout<<"Include HadronicBackgroundIsotopes.source"<<endl;
   hbout<<endl;
-  
+
   hbout.close();
-  
-  
-  
+
+
+
   ofstream hdout;
   hdout.open("HadronicComponentsDecay.source");
   if (hdout.is_open() == false) {
     mout<<"Unable to open: HadronicComponentsDecay.source"<<endl;
     return false;
-  }  
-  
+  }
+
   hdout<<"# Components file for the hadron simulations - decay"<<endl;
   hdout<<endl;
   hdout<<"Include Common.partial.source"<<endl;
@@ -2662,20 +3580,20 @@ bool BackgroundGenerator::WriteSummaryFiles()
   hdout<<endl;
   hdout<<"ActivationStep3.ActivationSources                HadronicBackgroundActivation.dat"<<endl;
   hdout<<endl;
-  
+
   hdout.close();
-  
-  
-  
-  
-  
+
+
+
+
+
   ofstream tiout;
   tiout.open("TrappedHadronicComponentsPrompt.source");
   if (tiout.is_open() == false) {
     mout<<"Unable to open: TrappedHadronicComponentsPrompt.source"<<endl;
     return false;
-  }  
-  
+  }
+
   tiout<<"# Components file for the trapped hadron simulations - prompt"<<endl;
   tiout<<endl;
   tiout<<"Include Common.partial.source"<<endl;
@@ -2696,18 +3614,18 @@ bool BackgroundGenerator::WriteSummaryFiles()
     tiout<<"Include "<<S<<".partial.source"<<endl;
   }
   tiout<<endl;
-  
+
   tiout.close();
-  
-  
-  
+
+
+
   ofstream tbout;
   tbout.open("TrappedHadronicComponentsBuildUp.source");
   if (tbout.is_open() == false) {
     mout<<"Unable to open: TrappedHadronicComponentsBuildUp.source"<<endl;
     return false;
-  }  
-  
+  }
+
   tbout<<"# Components file for the trapped hadron simulations - build up"<<endl;
   tbout<<endl;
   tbout<<"Include Common.partial.source"<<endl;
@@ -2726,18 +3644,18 @@ bool BackgroundGenerator::WriteSummaryFiles()
   tbout<<"# User > for i in `ls TrappedHadronicBackgroundIsotopes.p1.inc*.dat`; do echo \"A.IsotopeProductionFile $i\" >> TrappedHadronicBackgroundIsotopes.source; done"<<endl;
   tbout<<"Include TrappedHadronicBackgroundIsotopes.source"<<endl;
   tbout<<endl;
-  
+
   tbout.close();
-  
-  
-  
+
+
+
   ofstream tdout;
   tdout.open("TrappedHadronicComponentsDecay.source");
   if (tdout.is_open() == false) {
     mout<<"Unable to open: TrappedHadronicComponentsDecay.source"<<endl;
     return false;
-  }  
-  
+  }
+
   tdout<<"# Components file for the trapped hadron simulations - decay"<<endl;
   tdout<<endl;
   tdout<<"Include Common.partial.source"<<endl;
@@ -2753,11 +3671,11 @@ bool BackgroundGenerator::WriteSummaryFiles()
   tdout<<endl;
   tdout<<"ActivationStep3.ActivationSources    TrappedHadronicBackgroundActivation.dat"<<endl;
   tdout<<endl;
-  
+
   tdout.close();
-  
-  
-  
+
+
+
   return false;
 }
 
@@ -2823,11 +3741,11 @@ int main(int argc, char** argv)
   if (g_Prg->ParseCommandLine(argc, argv) == false) {
     cerr<<"Error during parsing of command line!"<<endl;
     return -1;
-  } 
+  }
   if (g_Prg->Analyze() == false) {
     cerr<<"Error during analysis!"<<endl;
     return -2;
-  } 
+  }
 
   //BackgroundGeneratorApp.Run();
 
