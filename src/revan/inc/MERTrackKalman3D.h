@@ -46,7 +46,7 @@ class MERTrackKalman3D : public MERTrack
   // protected methods:
  protected:
 
-  bool EvaluateTracks(MRERawEvent* ER);
+  //bool EvaluateTracks(MRERawEvent* ER);
   Float_t Kalman(MRERawEvent* RE, Int_t n, Float_t en, MRESEList Previous, vector < TMatrix > &trk, MRESEList &Chosen);
   tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t, MRESEList, MRESEList> SearchTracks(MRERawEvent* RE);
   Float_t MultipleScattering(vector < TMatrix > trk);

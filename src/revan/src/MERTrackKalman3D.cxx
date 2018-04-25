@@ -88,7 +88,7 @@ MERTrackKalman3D::~MERTrackKalman3D()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MERTrackKalman3D::EvaluateTracks(MRERawEvent* RE)
+/*bool MERTrackKalman3D::EvaluateTracks(MRERawEvent* RE)
 {
   // Evaluate the given tracks...
 
@@ -108,7 +108,7 @@ bool MERTrackKalman3D::EvaluateTracks(MRERawEvent* RE)
   RE->SetPairQualityFactor(MRERawEvent::c_NoQualityFactor);
 
   return true;
-}
+}*/
 
 
 
@@ -312,7 +312,8 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
       RE->SetVertex(*Iterator1);
 
       tie(Track1, E1, ChiT1, Track2, E2, ChiT2, Chosen1, Chosen2) = SearchTracks(RE);
-
+      RE->SetVertex(0);
+      
       if ((ChiT1==0. && ChiT2==0.) || !(Chosen1.GetNRESEs()>2 && Chosen2.GetNRESEs()>2)) continue;
       Chi2.push_back(ChiT1+ChiT2);
       ID.push_back((*Iterator1)->GetID());
@@ -334,7 +335,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
       RE->SetVertex(Vertex);
       RE->SetVertexDirection(VertexDirection);
       MRERawEvent *New = RE->Duplicate();
-      //RE->SetVertex(0);
+      RE->SetVertex(0);
       List->AddRawEvent(New);
 
       mdebug<<"Vertex: "<<Vertex->GetPosition().X()<<" "<<Vertex->GetPosition().Y()<<" "<<Vertex->GetPosition().Z()<<" "<<*min_element(Chi2.begin(), Chi2.end())<<endl;
