@@ -53,7 +53,7 @@ using namespace std;
 #include "MREHit.h"
 #include "MRESE.h"
 #include "MRESEIterator.h"
-#include "MRawEventList.h"
+#include "MRawEventIncarnations.h"
 #include "MPhysicalEvent.h"
 #include "MComptonEvent.h"
 #include "MMuonEvent.h"
@@ -74,7 +74,7 @@ using namespace std;
 #include "MDGuardRing.h"
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MRERawEvent)
 #endif
 
@@ -95,7 +95,7 @@ const double MRERawEvent::c_NoScore = numeric_limits<double>::max()/3; // remove
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MRERawEvent::MRERawEvent() : MRESE(), MRotationInterface()
+MRERawEvent::MRERawEvent() : MRESE(), MRotationInterface(), m_CoincidenceWindow(0)
 {
   // Construct one MRERawEvent-object
 
@@ -106,7 +106,7 @@ MRERawEvent::MRERawEvent() : MRESE(), MRotationInterface()
 ////////////////////////////////////////////////////////////////////////////////
 
 
-MRERawEvent::MRERawEvent(MGeometryRevan *Geo) : MRESE(), MRotationInterface()
+MRERawEvent::MRERawEvent(MGeometryRevan *Geo) : MRESE(), MRotationInterface(), m_CoincidenceWindow(0)
 {
   // Construct one MRERawEvent-object
 
@@ -323,6 +323,18 @@ MRERawEvent* MRERawEvent::Duplicate()
   return new MRERawEvent(this);
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+void MRERawEvent::Shuffle() 
+{
+  //! Shuffle the RESEs
+
+  m_RESEList->Shuffle();
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -506,6 +518,8 @@ MString MRERawEvent::ToString(bool WithLink, int Level)
 
 bool MRERawEvent::IsValid()
 {
+  if (m_IsValid == false) return false;
+  
   for (int i = 0; i < GetNRESEs(); i++) {
     if (GetRESEAt(i)->IsValid() == false) {
       return false;
@@ -659,6 +673,10 @@ MString MRERawEvent::GetEventTypeAsString()
 void MRERawEvent::SetRejectionReason(int Reason)
 {
   m_RejectionReason = Reason;
+  
+  if (m_RejectionReason != c_RejectionNone) {
+    m_IsValid = false;
+  }
 }
 
 
@@ -728,6 +746,27 @@ MString MRERawEvent::GetRejectionReasonAsString(int r, bool Short)
       out<<"EventRestrictedToDriftChambers";
     } else {
       out<<"Event is restricted to drift chambers";
+    }
+    break;
+  case c_RejectionD6Only:
+    if (Short == true) {
+      out<<"EventRestrictedToDirectionalStripDetectors";
+    } else {
+      out<<"Event is restricted to directional strip detectors";
+    }
+    break;
+  case c_RejectionD7Only:
+    if (Short == true) {
+      out<<"EventRestrictedToAngerCameras";
+    } else {
+      out<<"Event is restricted to Anger cameras";
+    }
+    break;
+  case c_RejectionD8Only:
+    if (Short == true) {
+      out<<"EventRestrictedToVoxelDetector";
+    } else {
+      out<<"Event is restricted to voxel detectors";
     }
     break;
   case c_RejectionTwoTracksOnly:
@@ -870,6 +909,41 @@ MString MRERawEvent::GetRejectionReasonAsString(int r, bool Short)
       out<<"External bad event flag raised";
     }
     break;
+  case c_RejectionEventClusteringTooManyHits:
+    if (Short == true) {
+      out<<"EventClusteringTooManyHits";
+    } else {
+      out<<"Too many hits for the event clustering";
+    }
+    break;
+  case c_RejectionTooManyEventIncarnations:
+    if (Short == true) {
+      out<<"TooManyEventIncarnations";
+    } else {
+      out<<"Too many event incarnations";
+    }
+    break;
+  case c_RejectionEventClusteringUnresolvedHits:
+    if (Short == true) {
+      out<<"EventClusteringUnresolvedHits";
+    } else {
+      out<<"Unresolved hits in event clustering";
+    }
+    break;
+  case c_RejectionEventClusteringNoOrigins:
+    if (Short == true) {
+      out<<"EventClusteringNoOrigins";
+    } else {
+      out<<"No origins found during event clustering";
+    }
+    break;
+  case c_RejectionEventClusteringEnergyOutOfBounds:
+    if (Short == true) {
+      out<<"EventClusteringEnergyOutOfBounds";
+    } else {
+      out<<"The energy is outside of what the event clustering was trained for";
+    }
+    break;
   default:
     if (Short == true) {
       out<<"";
@@ -962,7 +1036,7 @@ MPhysicalEvent* MRERawEvent::GetPhysicalEvent()
                        Position2,
                        ((MRETrack *) m_Start)->GetDirection(), ED1, ED2);
         CE->SetTrackLength(m_Start->GetNRESEs());
-        CE->SetTrackInitialDeposit(m_Start->GetRESEAt(0)->GetEnergy());
+        CE->SetTrackInitialDeposit(((MRETrack *) m_Start)->GetStartPoint()->GetEnergy());
         CE->SetTrackQualityFactor1(m_TrackQualityFactor);
       } else {
         CE->Assimilate(m_Start->GetPosition(),
@@ -1751,7 +1825,7 @@ int MRERawEvent::ParseLine(const char* Line, int Version)
 
     MREHit* Hit = new MREHit();
     if (Hit->ParseLine(Line, Version) == false) {
-      mout<<"Event "<<m_EventID<<": Unable to parse line:"<<endl;
+      mout<<"Event "<<m_EventID<<": Unable to parse line - removing hit"<<endl;
       mout<<Line<<endl;
       m_IsValid = false;
       delete Hit;
@@ -1763,17 +1837,21 @@ int MRERawEvent::ParseLine(const char* Line, int Version)
       // Use the information from the geometry file:
       if (m_Geo != 0) {
         if (Hit->RetrieveResolutions(m_Geo) == false) {
-          mout<<"Event "<<m_EventID<<": Unable to determine resolutions:"<<endl;
+          mout<<"Event "<<m_EventID<<": Unable to determine resolutions - removing hit"<<endl;
           mout<<Line<<endl;
-          Ret = 1;
+          m_IsValid = false;
+          delete Hit;
+          return 2;  
         }
       }
     } else {
       if (m_Geo != 0) {
         if (Hit->UpdateVolumeSequence(m_Geo) == false) {
-          mout<<"Event "<<m_EventID<<": Unable to update volume sequence:"<<endl;
+          mout<<"Event "<<m_EventID<<": Unable to update volume sequence - removing hit"<<endl;
           mout<<Line<<endl;
-          Ret = 1;
+          m_IsValid = false;
+          delete Hit;
+          return 2; // We need to return not parsed here since we most likely  changed the geometry (e.g. removed detectors) and don't want those hits
         }
       }
     }

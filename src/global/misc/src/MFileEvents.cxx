@@ -37,11 +37,13 @@ using namespace std;
 #include "MStreams.h"
 #include "MTime.h"
 #include "MTokenizer.h"
+#include "MGUIProgressBar.h"
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MFileEvents)
 #endif
 
@@ -232,7 +234,7 @@ bool MFileEvents::ReadFooter(bool Continue)
   streampos Position = GetUncompressedFilePosition();
 
   if (Continue == false) {
-    MFile::Rewind();
+    MFile::Rewind(!m_IsIncludeFile);
     if (GetUncompressedFileLength() > (streampos) 100000) {
       Seek(GetUncompressedFileLength(false) - streamoff(100000));
     }
@@ -303,11 +305,11 @@ bool MFileEvents::ParseFooter(const MString& Line)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-bool MFileEvents::Rewind()
+bool MFileEvents::Rewind(bool)
 {
   // Rewind to the beginning of the file
   // Since we might be somewhere within a file tree, we simply start over
-
+  
   if (m_IsOpen == false) {
     return false;
   }
@@ -834,7 +836,8 @@ bool MFileEvents::UpdateProgress(unsigned int UpdatesToSkip)
   double Value = 0;
   if (m_NIncludeFiles > 0) {
     if (m_NOpenedIncludeFiles > 0) {
-      Value = (double) (m_NOpenedIncludeFiles - 1) / (double) m_NIncludeFiles;
+      Value = (double) (m_NOpenedIncludeFiles - 1) / (double) m_NIncludeFiles; // -1 since we do not count the currently opened as finished
+      if (Value < 0) Value = 0;
     }
   } else {
     Value = (double) GetFilePosition() / (double) GetFileLength();

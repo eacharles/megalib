@@ -56,7 +56,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MRESE)
 #endif
 
@@ -182,17 +182,6 @@ MRESE::~MRESE()
   delete m_VolumeSequence;
   delete m_RESEList;
   delete m_LinkList;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-void MRESE::DeleteAll()
-{
-  // Delete the links and RESEs of this event
-
-  m_RESEList->DeleteAll();
 }
 
 
@@ -934,6 +923,29 @@ MRESE* MRESE::RemoveRESEAndCompress(int ID)
 ////////////////////////////////////////////////////////////////////////////////
 
 
+void MRESE::RemoveAll()
+{
+  // Delete the links and RESEs of this event
+  
+  m_RESEList->RemoveAllRESEs();
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+void MRESE::RemoveAllAndCompress()
+{
+  // Delete the links and RESEs of this event
+  
+  m_RESEList->RemoveAllRESEs();
+  m_RESEList->Compress();
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
 void MRESE::DeleteRESE(MRESE* RESE)
 {
   // Delete RESE from *this* RESE. Afterwards we have an empty slot!
@@ -1039,6 +1051,17 @@ void MRESE::DeleteRESEAndCompress(int ID)
 
   RESE->DeleteAll();
   delete RESE;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+void MRESE::DeleteAll()
+{
+  // Delete the links and RESEs of this event
+  
+  m_RESEList->DeleteAll();
 }
 
 

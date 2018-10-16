@@ -27,7 +27,7 @@ using namespace std;
 #include "MGlobal.h"
 #include "MERConstruction.h"
 #include "MERCSR.h"
-#include "MRawEventList.h"
+#include "MRawEventIncarnations.h"
 #include "MComptonEvent.h"
 #include "MResponseMatrixO1.h"
 #include "MResponseMatrixO2.h"
@@ -141,7 +141,7 @@ class MERCSRBayesian : public MERCSR
   MResponseMatrixO1 m_SumBadStopDeposit;
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MERCSRBayesian, 0) // no description
 #endif

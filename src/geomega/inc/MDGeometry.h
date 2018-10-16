@@ -72,8 +72,11 @@ class MDGeometry
   //! available in the normal library mode, e.g. view the surrounding sphere
   void LaunchedByGeomega() { m_LaunchedByGeomega = true; } 
   
-  //! Check for overlaps using the ROOT overlap checker
+  //! Check for overlaps using the ROOT overlap checker 
   bool CheckOverlaps();
+  //! Check for overlaps using the ROOT overlap checker - diagnostics is returned in the stream instead of the screen
+  bool CheckOverlaps(ostringstream& Diagnostics);
+
   //! Add a preferred visible volume --- if any is given, only those will be shown
   void AddPreferredVisibleVolume(const MString& Name) { m_PreferredVisibleVolumeNames.push_back(Name); }
   
@@ -300,7 +303,7 @@ class MDGeometry
   vector<int> m_LastFoundPlacements_GetRandomPositionInVolume;
   
   
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MDGeometry, 0) // no description
 #endif

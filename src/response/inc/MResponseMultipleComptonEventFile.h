@@ -81,9 +81,6 @@ class MResponseMultipleComptonEventFile : public MResponseMultipleCompton
   //! Return the number of Compton interactions
   unsigned int NumberOfComptonInteractions(vector<int> AllSimIds);
 
-  //! Shuffle the RESEs around...
-  void Shuffle(vector<MRESE*>& RESEs);
-
   //! Teach the neural network the events
   void Teach();
 
@@ -111,7 +108,7 @@ class MResponseMultipleComptonEventFile : public MResponseMultipleCompton
   
 
   
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MResponseMultipleComptonEventFile, 0) // no description
 #endif

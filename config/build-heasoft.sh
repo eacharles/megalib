@@ -110,7 +110,8 @@ else
   echo "Looking for latest HEASoft version on the HEASoft website"
   
   # Now check root repository for the given version:
-  TARBALL=`curl ftp://heasarc.gsfc.nasa.gov/software/lheasoft/release/ -sl | grep "^heasoft\-" | grep "[0-9]src.tar.gz$"`
+  #TARBALL=`curl ftp://legacy.gsfc.nasa.gov/software/lheasoft/release/ -sl | grep "^heasoft\-" | grep "[0-9]src.tar.gz$"`
+  TARBALL=$(curl https://heasarc.gsfc.nasa.gov/FTP/software/lheasoft/release/ -sl | grep ">heasoft-" | grep "[0-9]src.tar.gz<" | awk -F">" '{ print $3 }' | awk -F"<" '{print $1 }')
   if [ "${TARBALL}" == "" ]; then
     echo "ERROR: Unable to find suitable HEASoft tar ball at the HEASoft website"
     exit 1
@@ -122,7 +123,7 @@ else
   if [ -f "${TARBALL}" ]; then
     # ... and has the same size
     LOCALSIZE=`wc -c < ${TARBALL} | tr -d ' '`
-    SAMESIZE=`curl --head ftp://heasarc.gsfc.nasa.gov/software/lheasoft/release/${TARBALL}`
+    SAMESIZE=`curl --head https://heasarc.gsfc.nasa.gov/FTP/software/lheasoft/release/${TARBALL}`
     if [ "$?" != "0" ]; then
       echo "ERROR: Unable to determine remote tarball size"
       exit 1
@@ -135,7 +136,7 @@ else
   fi
   
   if [ "${REQUIREDOWNLOAD}" == "true" ]; then
-    curl -O ftp://heasarc.gsfc.nasa.gov/software/lheasoft/release/${TARBALL}
+    curl -O https://heasarc.gsfc.nasa.gov/FTP/software/lheasoft/release/${TARBALL}
     if [ "$?" != "0" ]; then
       echo "ERROR: Unable to download the tarball from the HEASoft website!"
       exit 1
@@ -204,10 +205,10 @@ echo "Configuring..."
 # Minimze the LD_LIBRARY_PATH to prevent problems with multiple readline's
 cd heasoft_v${VER}/BUILD_DIR
 export LD_LIBRARY_PATH=/usr/lib
-sh configure ${CONFIGUREOPTIONS} > config.out 2>&1
+sh configure ${CONFIGUREOPTIONS} > config.log 2>&1
 if [ "$?" != "0" ]; then
   echo "ERROR: Something went wrong configuring HEASoft!"
-  echo "       Check the file "`pwd`"/config.out"
+  echo "       Check the file "`pwd`"/config.log"
   exit 1
 fi
 
@@ -220,11 +221,11 @@ if [ "$?" != "0" ]; then
   echo "       Check the file "`pwd`"/build.log"
   exit 1
 fi
-ERRORS=`grep -v "char \*\*\*" build.log | grep "\ \*\*\*\ "`
+ERRORS=$(cat build.log | grep -v "char \*\*\*" | grep -v "\_\_PRETTY\_FUNCTION\_\_\,\" \*\*\*" | grep "\ \*\*\*\ ")
 if [ "${ERRORS}" == "" ]; then
   echo "Installing ..."
   make -j1 install > install.log 2>&1 
-  ERRORS=`grep -v "char \*\*\*" install.log | grep "\ \*\*\*\ "`
+  ERRORS=$(cat install.log | grep -v "char \*\*\*" | grep -v "\_\_PRETTY\_FUNCTION\_\_\,\" \*\*\*" | grep "\ \*\*\*\ ")
   if [ "${ERRORS}" != "" ]; then
     echo "ERROR: Errors occured during the installation. Check your install.log"
     echo "       Check the file "`pwd`"/install.log"

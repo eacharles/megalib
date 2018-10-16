@@ -35,7 +35,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MExposure)
 #endif
 
@@ -220,7 +220,7 @@ bool MExposure::ApplyExposure()
             MVector D = Inv*m_BinCenterVectors[index];
 
             // Get the efficiency value
-            double EfficiencyValue = m_Efficiency->Get(D.ThetaFastMath(), D.PhiFastMath());
+            double EfficiencyValue = m_Efficiency->Get(D.ThetaApproximateMaths(), D.PhiApproximateMaths());
 
             if (std::isnan(EfficiencyValue)) {
               cout<<"NaN!"<<endl;

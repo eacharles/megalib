@@ -23,13 +23,15 @@
 
 // MEGAlib libs:
 #include "MGlobal.h"
-#include "MGUIProgressBar.h"
 
-// Forward declarations:
+// Standard libs:
 #include <fstream>
 #include <sstream>
 #include <streambuf>
 using namespace std;
+
+// Forward declarations:
+class MGUIProgressBar;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +54,7 @@ class MFile
   //! Close the file
   virtual bool Close();
   //! Rewind the file
-  virtual bool Rewind();
+  virtual bool Rewind(bool ResetProgressStatistics = true);
 
   //! Return true if the file is open
   virtual bool IsOpen();
@@ -252,7 +254,7 @@ class MFile
   unsigned long m_ReadLineBufferLength;
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MFile, 0) // no description
 #endif

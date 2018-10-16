@@ -69,6 +69,10 @@ class MDAngerCamera : public MDDetector
 
   //! Set the type XY-only or XYZ-only
   void SetPositioning(int Positioning) { m_PositionResolutionType = Positioning; }
+  //! Get the positioning
+  int GetPositioning() const { return m_PositionResolutionType; }
+  
+  
   void SetPositionResolution(const double Energy, const double Resolution);
 
   static const int c_PositionResolutionUnknown;
@@ -97,7 +101,7 @@ class MDAngerCamera : public MDDetector
   MFunction m_PositionResolution; 
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MDAngerCamera, 0) // a basic AngerCamera detector
 #endif

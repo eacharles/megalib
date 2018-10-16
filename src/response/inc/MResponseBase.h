@@ -187,8 +187,10 @@ class MResponseBase
 
   //! The current sivan event
   MSimEvent* m_SiEvent;
-  //! The current revan event
+  //! The current revan event - first one if multiple
   MRERawEvent* m_ReEvent;
+  //! The current revan event list
+  vector<MRERawEvent*> m_ReEvents;
   //! The IDs of all RESEs
   map<MRESE*, vector<int> > m_Ids;
   //! The origin IDs of all RESEs
@@ -201,7 +203,7 @@ class MResponseBase
  private:
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MResponseBase, 0) // no description
 #endif

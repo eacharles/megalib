@@ -35,6 +35,7 @@ using namespace std;
 // MEGAlib libs:
 #include "MAssert.h"
 #include "MStreams.h"
+#include "MTimer.h"
 #include "MResponseMatrixAxis.h"
 #include "MResponseMatrixAxisSpheric.h"
 
@@ -42,7 +43,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MResponseEventQuality)
 #endif
 
@@ -123,13 +124,13 @@ bool MResponseEventQuality::Analyze()
   }
   
   // We require a successful reconstruction 
-  MRawEventList* REList = m_ReReader->GetRawEventList();
-  if (REList->HasOptimumEvent() == false) {
+  MRawEventIncarnationList* REList = m_ReReader->GetRawEventList();
+  if (REList->HasOnlyOptimumEvents() == false) {
     return true;
   }
     
   // ... leading to an event
-  MPhysicalEvent* Event = REList->GetOptimumEvent()->GetPhysicalEvent();
+  MPhysicalEvent* Event = REList->GetOptimumEvents()[0]->GetPhysicalEvent();
   if (Event == nullptr) {
     return true;
   }

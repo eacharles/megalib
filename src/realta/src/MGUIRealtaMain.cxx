@@ -58,7 +58,7 @@ using namespace std;
 
 #include "MGUIERAlgorithm.h"
 #include "MGUIOptionsCoincidence.h"
-#include "MGUIOptionsClustering.h"
+#include "MGUIOptionsHitClustering.h"
 #include "MGUIOptionsTracking.h"
 #include "MGUIOptionsCSR.h"
 #include "MGUIOptionsGeneral.h"
@@ -89,7 +89,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MGUIRealtaMain)
 #endif
 
@@ -475,7 +475,7 @@ Bool_t MGUIRealtaMain::ProcessMessage(Long_t Message, Long_t Parameter1,
         break;
 
       case c_Clustering:
-        new MGUIOptionsClustering(gClient->GetRoot(), this, m_Settings);
+        new MGUIOptionsHitClustering(gClient->GetRoot(), this, m_Settings);
         break;
 
       case c_Sequencing:

@@ -41,7 +41,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MFileEventsSim)
 #endif
 
@@ -132,7 +132,7 @@ bool MFileEventsSim::Open(MString FileName, unsigned int Way)
     while (IsGood() == true) {
       if (ReadLine(Line) == false) break;
       
-      if (Line.BeginsWith("SimulationStartAreaFarField") == true) {
+      if (Line.BeginsWith("SimulationStartAreaFarField") == true || Line.BeginsWith("StartAreaFarField") == true) {
         MTokenizer Tokens;
         Tokens.Analyze(Line);
         if (Tokens.GetNTokens() != 2) {
@@ -149,6 +149,10 @@ bool MFileEventsSim::Open(MString FileName, unsigned int Way)
       }
     }
   }
+  
+  
+  // Now rewind - we need a clean slate for the GetNextEvent parser
+  MFile::Rewind();
 
   return true;
 }
@@ -232,9 +236,13 @@ void MFileEventsSim::UpdateObservationTimes(MSimEvent* Event)
 
 MSimEvent* MFileEventsSim::GetNextEvent(bool Analyze)
 {
-  // Return the next event... or 0 if it is the last one
-  // So remember to test for more events!
-
+  // Return the next event... or nullptr if it is the last one
+  // So remember to test for no more events!
+  
+  // Start with updating the progress, return 0 if cancel has pressed
+  if (UpdateProgress() == false) return nullptr;  
+  
+  
   MSimEvent* SimEvent = nullptr;
   
   if (m_IncludeFileUsed == true) {
@@ -250,21 +258,27 @@ MSimEvent* MFileEventsSim::GetNextEvent(bool Analyze)
     }
   }
 
-  if (UpdateProgress() == false) return 0;
-
-
+  bool BeyondFirstSE = true;
+  if (GetFilePosition() == 0) BeyondFirstSE = false;
+  
   MString Line;
   while (IsGood() == true) {
     if (ReadLine(Line) == false) break;
     if (Line.Length() < 2) continue;
-
+    
     if (Line[0] == 'S' && Line[1] == 'E') {
-      if (SimEvent != nullptr) { // If this is not the first event...
-        if (Analyze == true) {
-          SimEvent->Analyze();
+      if (BeyondFirstSE == true) { // If this is not the first event...
+        if (SimEvent != nullptr) {
+          if (Analyze == true) {
+            SimEvent->Analyze();
+          }
+          UpdateObservationTimes(SimEvent);
         }
-        UpdateObservationTimes(SimEvent);
         return SimEvent;
+      } else {
+        BeyondFirstSE = true;
+        SimEvent = new MSimEvent();
+        SimEvent->SetGeometry(m_Geometry);
       }
     } else if (Line[0] == 'N' && Line[1] == 'F') {
       if (OpenNextFile(Line) == 0) {
@@ -320,16 +334,18 @@ MSimEvent* MFileEventsSim::GetNextEvent(bool Analyze)
     // All other keyword directly related to an event
     else {
       // Let the raw event scan the line
-      if (SimEvent == nullptr) {
-        SimEvent = new MSimEvent();
-        SimEvent->SetGeometry(m_Geometry);
+      if (BeyondFirstSE == true) {
+        if (SimEvent == nullptr) {
+          SimEvent = new MSimEvent();
+          SimEvent->SetGeometry(m_Geometry);
+        }
+        SimEvent->AddRawInput(Line, m_Version);
       }
-      SimEvent->AddRawInput(Line, m_Version);
     }
   }
 
   // That's a dirty little trick in case we forgot the EN in the file
-  // Works since thers is currently no case exits where a sim file has neither no IAs or no HTs...
+  // Works since there is currently no case where a sim file has neither no IAs or no HTs...
   if (SimEvent != nullptr && (SimEvent->GetNIAs() != 0 || SimEvent->GetNHTs() != 0)) {
     UpdateObservationTimes(SimEvent);
     return SimEvent;
@@ -338,7 +354,7 @@ MSimEvent* MFileEventsSim::GetNextEvent(bool Analyze)
   // The end of the (master) file has been reached...
   ShowProgress(false);
 
-  // We are at the end of the file, and the last event got partially read:
+  // Final clean up
   if (SimEvent != nullptr) {
     delete SimEvent;
   }

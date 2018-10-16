@@ -269,6 +269,12 @@ void MCSteppingAction::UserSteppingAction(const G4Step* Step)
       return;
     }
   }
+  
+  if (Track->GetCurrentStepNumber() > 10000000) {
+    merr<<"Geant4 hick-up: The event seems to be stuck 10,000,000 steps! Aborting track!"<<endl;
+    Track->SetTrackStatus(fStopAndKill);
+    return;
+  }
 
   // Prepare the IA interactions:
   if (Step->GetPostStepPoint()->GetProcessDefinedStep() != 0) {
@@ -841,10 +847,17 @@ void MCSteppingAction::UserSteppingAction(const G4Step* Step)
             DoNotStart = false;
           } else {
             // Delay secondary decays to the future:
-            Keep = false;
-            Store = false;
-            FutureEvent = true;
-            DoNotStart = false;
+            if (TimeDelay > m_DetectorTimeConstant) {
+              Keep = false;
+              Store = false;
+              FutureEvent = true;
+              DoNotStart = false;
+            } else {
+              Keep = true;
+              Store = false;
+              FutureEvent = false;
+              DoNotStart = false;
+            }
           }
         } else if (m_DecayMode == MCParameterFile::c_DecayModeActivationBuildUp) {
           // Only store non-instantaneous decays (instantaneous would be vetoes with incoming proton!)
@@ -909,6 +922,8 @@ void MCSteppingAction::UserSteppingAction(const G4Step* Step)
           MCRunManager::GetMCRunManager()->GetCurrentRun().AddIsotope(Nucleus, Hist);
 
           //mout<<"Storing isotope: "<<Nucleus->GetParticleName()<<endl;
+          
+          EventAction->AddComment("Storing isotope: " + Nucleus->GetParticleName());
         }
         
         if (Keep == true) {
@@ -998,6 +1013,8 @@ void MCSteppingAction::UserSteppingAction(const G4Step* Step)
                                                                                  Track->GetDefinition(),
                                                                                  Name);
           //cout<<"Global time: "<<Step->GetPostStepPoint()->GetGlobalTime()/second<<"sec"<<endl;
+          
+          EventAction->AddComment("Future decay: " + Track->GetDefinition()->GetParticleName() + " at t=" + to_string(GlobalTime/second) + " sec");
         }
       }
     } else if (ProcessID == c_ProcessIDIonization && m_StoreIonization == true) {

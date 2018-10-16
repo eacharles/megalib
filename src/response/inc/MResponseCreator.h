@@ -126,11 +126,13 @@ class MResponseCreator
     c_ModeEventQuality,
     c_ModeStripPairingTMVAEventFile,
     c_ModeEventQualityTMVAEventFile,
-    c_ModeComptelDataSpace
+    c_ModeComptelDataSpace,
+    c_ModeEventClusterizerTMVAEventFile,
+    c_ModeEventClusterizerTMVA
   };
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MResponseCreator, 0) // no description
 #endif

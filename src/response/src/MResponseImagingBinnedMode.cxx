@@ -42,7 +42,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MResponseImagingBinnedMode)
 #endif
 
@@ -331,13 +331,13 @@ bool MResponseImagingBinnedMode::Analyze()
   }
   
   // We require a successful reconstruction 
-  MRawEventList* REList = m_ReReader->GetRawEventList();
-  if (REList->HasOptimumEvent() == false) {
+  MRawEventIncarnationList* REList = m_ReReader->GetRawEventList();
+  if (REList->HasOnlyOptimumEvents() == false) {
     return true;
   }
     
   // ... leading to an event
-  MPhysicalEvent* Event = REList->GetOptimumEvent()->GetPhysicalEvent();
+  MPhysicalEvent* Event = REList->GetOptimumEvents()[0]->GetPhysicalEvent();
   if (Event == nullptr) {
     return true;
   }

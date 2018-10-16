@@ -66,10 +66,16 @@ class MSettingsEventSelections : public MSettingsInterface
 
   int GetEventTypePair() const { return m_EventTypePair; }
   void SetEventTypePair(int EventTypePair) { m_EventTypePair = EventTypePair; m_EventSelectionModified = true; }
-
+  
   int GetEventTypePhoto() const { return m_EventTypePhoto; }
   void SetEventTypePhoto(int EventTypePhoto) { m_EventTypePhoto = EventTypePhoto; m_EventSelectionModified = true; }
-
+  
+  int GetEventTypePET() const { return m_EventTypePET; }
+  void SetEventTypePET(int EventTypePET) { m_EventTypePET = EventTypePET; m_EventSelectionModified = true; }
+  
+  int GetEventTypeMulti() const { return m_EventTypeMulti; }
+  void SetEventTypeMulti(int EventTypeMulti) { m_EventTypeMulti = EventTypeMulti; m_EventSelectionModified = true; }
+  
   int GetEventTypeUnidentifiable() const { return m_EventTypeUnidentifiable; }
   void SetEventTypeUnidentifiable(int EventTypeUnidentifiable) { m_EventTypeUnidentifiable = EventTypeUnidentifiable; m_EventSelectionModified = true; }
 
@@ -436,6 +442,8 @@ class MSettingsEventSelections : public MSettingsInterface
   int m_EventTypeComptonTracked;
   int m_EventTypePair;
   int m_EventTypePhoto;
+  int m_EventTypePET;
+  int m_EventTypeMulti;
   int m_EventTypeUnidentifiable;
   int m_EventTypeDecay;
 
@@ -490,7 +498,7 @@ class MSettingsEventSelections : public MSettingsInterface
   bool m_SpecialMode;
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MSettingsEventSelections, 0) // no description
 #endif

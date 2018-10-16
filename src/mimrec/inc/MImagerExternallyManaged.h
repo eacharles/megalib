@@ -65,7 +65,11 @@ class MImagerExternallyManaged : public MImager
 
   //! Deconvolve a set of response slices 
   vector<MImage*> Deconvolve(vector<MBPData*> ResponseSlices);
-
+  
+ // Addition from Christian Lang
+  //---------------------------------------------------------
+  //MBPData* CalculateResponseSliceLine(MPhysicalEvent* Event, double X1Position, double Y1Position, double Z1Position, double X2Position, double Y2Position, double Z2Position);
+//------------------------------------------------------------
 
   // protected methods:
  protected:
@@ -76,7 +80,7 @@ class MImagerExternallyManaged : public MImager
   //! True if GUI features are used, i.e. progress bar, call ProcessEvents, etc. (default: true)
   bool m_UseGUI;
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MImagerExternallyManaged, 0) // Computes and stores system matrix
 #endif

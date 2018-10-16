@@ -55,7 +55,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MGUIMimrecMain)
 #endif
 
@@ -174,6 +174,7 @@ void MGUIMimrecMain::Create()
   MenuARM->AddEntry("SPD of recoil electron vs Compton Scatter Angel (phi)", c_ResponseSpdElectronVsCompton);
   MenuARM->AddEntry("Dual ARM", c_ResponseDualArm);
   MenuARM->AddEntry("ARM-imaging-response comparison", c_ResponseArmComparison);
+  MenuARM->AddEntry("Resolution Measure PET", c_ResponseResolutionMeasurePET);
   MenuARM->Associate(this);
 
   // The sub menu quality factors:
@@ -460,6 +461,14 @@ bool MGUIMimrecMain::ProcessMessage(long Message, long Parameter1,
         }
         break;
         
+        
+      case c_ResponseResolutionMeasurePET:
+        new MGUIARM(gClient->GetRoot(), this, m_Data, MGUIARMModes::m_PET, OKPressed);
+        if (OKPressed == true) {
+          m_Interface->ResolutionMeasurePET();
+        }
+        break;
+        
       case c_ResponseSPDVsTrackQualityFactor:
         new MGUIARM(gClient->GetRoot(), this, m_Data, MGUIARMModes::m_ARMElectron, OKPressed);
         if (OKPressed == true) {
@@ -529,7 +538,10 @@ bool MGUIMimrecMain::ProcessMessage(long Message, long Parameter1,
         break;
 
       case c_ResponseEnergyDistributionD1D2:
-        m_Interface->EnergyDistributionElectronPhoton();
+        new MGUIARM(gClient->GetRoot(), this, m_Data, MGUIARMModes::m_Spectrum, OKPressed);
+        if (OKPressed == true) {
+          m_Interface->EnergyDistributionElectronPhoton();
+        }
         break;
 
       case c_ResponseTime:

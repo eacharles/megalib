@@ -27,7 +27,7 @@ using namespace std;
 #include "MGlobal.h"
 #include "MERConstruction.h"
 #include "MERCSR.h"
-#include "MRawEventList.h"
+#include "MRawEventIncarnations.h"
 #include "MComptonEvent.h"
 #include "MNeuralNetworkBackpropagation.h"
 #include "MVector.h"
@@ -112,7 +112,7 @@ class MERCSRNeuralNetwork : public MERCSR
   bool m_UseComptonScatterAngles;
   bool m_UseDPhiCriterion;
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MERCSRNeuralNetwork, 0) // no description
 #endif

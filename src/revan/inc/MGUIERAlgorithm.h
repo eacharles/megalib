@@ -58,7 +58,8 @@ class MGUIERAlgorithm : public MGUIDialog
 
   TGLayoutHints* m_ListLayout;
   MGUIERBList* m_CoincidenceList;
-  MGUIERBList* m_ClusteringList;
+  MGUIERBList* m_EventClusteringList;
+  MGUIERBList* m_HitClusteringList;
   MGUIERBList* m_TrackingList;
   MGUIERBList* m_CSRList;
   MGUIERBList* m_PairList;
@@ -66,7 +67,7 @@ class MGUIERAlgorithm : public MGUIDialog
 
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MGUIERAlgorithm, 0)
 #endif

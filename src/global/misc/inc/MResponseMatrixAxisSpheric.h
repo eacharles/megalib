@@ -53,8 +53,6 @@ class MResponseMatrixAxisSpheric : public MResponseMatrixAxis
   void SetFISBEL(unsigned long NBins, double LongitudeShift = 0);
   
 
-  //! Return the number of axis bins
-  virtual unsigned long GetNumberOfBins() const { return m_Binner.GetNBins(); }
   //! Return the axis bin, given theta=latitude and phi=longitude in degrees
   virtual unsigned long GetAxisBin(double Theta, double Phi) const;
   
@@ -62,10 +60,10 @@ class MResponseMatrixAxisSpheric : public MResponseMatrixAxis
   virtual bool InRange(double Theta, double Phi) const;
   
   //! True if the axis has 1D bin edges
-  virtual bool Has1DBinEdges() { return false; }
+  virtual bool Has1DBinEdges() const { return false; }
   //! Get the 1D bin edges
   //! Check with Has1DBinEdges first, because this is not guaranteed
-  virtual vector<double> Get1DBinEdges() { return vector<double>(); }
+  virtual vector<double> Get1DBinEdges() const { return vector<double>(); }
   
   //! Return the area of the given axis bin
   virtual double GetArea(unsigned long Bin) const;
@@ -104,7 +102,7 @@ class MResponseMatrixAxisSpheric : public MResponseMatrixAxis
   MBinnerFISBEL m_Binner;
   
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MResponseMatrixAxisSpheric, 0) // no description
 #endif

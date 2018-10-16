@@ -27,7 +27,7 @@ using namespace std;
 #include "MGlobal.h"
 #include "MERConstruction.h"
 #include "MERCSR.h"
-#include "MRawEventList.h"
+#include "MRawEventIncarnations.h"
 #include "MComptonEvent.h"
 #include "MVector.h"
 #include "MERCSRDataSet.h"
@@ -102,7 +102,7 @@ class MERCSRTMVA : public MERCSR
   bool m_UsePathToFirstIA;
   
   
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MERCSRTMVA, 0) // no description
 #endif

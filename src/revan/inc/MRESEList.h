@@ -51,11 +51,15 @@ class MRESEList
   void AddRESEFirst(MRESE* RESE);
   MRESE* RemoveRESE(MRESE* RESE);
   MRESE* RemoveRESEAt(int i);
+  //! Removes all RESE - The list is NOT compressed!
   void RemoveAllRESEs();
   void DeleteAll();
   void CompressRESEs() { Compress(); } // depreciated!
   void Compress();
 
+  //! Shuffle the RESE's randomly around
+  void Shuffle();
+  
   virtual MRESEList* Duplicate();
   MString ToString(bool WithLink = true, int Level = 0);
 
@@ -66,7 +70,7 @@ class MRESEList
 
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MRESEList, 0) // a list of raw event sub elements 
 #endif

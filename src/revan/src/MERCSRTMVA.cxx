@@ -52,10 +52,11 @@ using namespace std;
 #include "MGeometryRevan.h"
 #include "MERCSRBayesian.h"
 
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MERCSRTMVA)
 #endif
 
@@ -289,6 +290,7 @@ MString MERCSRTMVA::ToString(bool CoreOnly) const
   
   return out.str().c_str();
 }
+
 
 // MERCSRTMVA.cxx: the end...
 ////////////////////////////////////////////////////////////////////////////////

@@ -52,10 +52,11 @@ using namespace std;
 #include "MPhysicalEvent.h"
 #include "MResponseMatrixON.h"
 #include "MResponseMatrixAxis.h"
+#include "MResponseMatrixAxisSpheric.h"
 #include "MEventSelector.h"
 #include "MSettingsMimrec.h"
 #include "MImageGalactic.h"
-#include "MResponseMatrixAxisSpheric.h"
+#include "MTimer.h"
 
 
 /******************************************************************************/
@@ -115,14 +116,14 @@ protected:
   bool ReconstructMEM();
   
   //! Show an image in Galactic coordinates
-  bool ShowImageGalacticCoordinates(MResponseMatrixON Image, MString Title, MString zAxis, bool Save = false);
+  bool ShowImageGalacticCoordinates(MResponseMatrixON Image, MString Title, MString zAxis, bool Save = false, MString SaveTitle = "");
   
   
 private:
   //! True, if the analysis needs to be interrupted
   bool m_Interrupt;
   
-  //! Wriet files
+  //! Write files
   bool m_WriteFiles;
   
   //! Just create the background model
@@ -182,6 +183,10 @@ private:
   MString m_ResponseGalacticFileName;
   //! The complete response
   MResponseMatrixON m_ResponseGalactic;
+  //! A speed up matrix, do calculate the Galactic response faster
+  vector<unsigned long> m_GalacticResponseSpeedUpMatrix;
+  //! The maximum Compton scatter angle bin:
+  unsigned int m_MaxFinalPhiBin;
   
   //! The exposure map
   MResponseMatrixON m_ExposureMap;
@@ -210,6 +215,12 @@ private:
   vector<bool> m_ThreadRunning;
   //! The main mutex
   mutex m_ThreadMutex;
+  
+  //! The longitude shift of all FISBEL images 
+  double m_LongitudeShift;
+  
+  //! Out put file name prefix
+  MString m_Prefix;
 };
 
 /******************************************************************************/
@@ -221,12 +232,17 @@ private:
 BinnedComptonImaging::BinnedComptonImaging() : m_Interrupt(false)
 {
   gStyle->SetPalette(kBird);
-  
+ 	gROOT->SetBatch(true);
+
   m_DeconvolutionAlgorithm = 1;
   m_UseBackgroundModel = false;  
   m_JustBuildBackgroundModel = false;
   
   m_WriteFiles = false;
+  
+  m_LongitudeShift = -180;
+  
+  m_Prefix = "";
 }
 
 
@@ -252,11 +268,12 @@ bool BinnedComptonImaging::ParseCommandLine(int argc, char** argv)
   Usage<<"         -c:   mimrec configuration file"<<endl;
   Usage<<"         -r:   response file"<<endl;
   Usage<<"         -g:   load the galactic rotations"<<endl;
-  Usage<<"         -b:   load the precrated background model (can appear more than once)"<<endl;
+  Usage<<"         -b:   load the pre-created background model (can appear more than once)"<<endl;
   Usage<<"         -i:   number of iterations (default: 5)"<<endl;
   Usage<<"         -a:   algorithm: rl (default) or mem"<<endl;
   Usage<<"         -cb:  create background model"<<endl;
   Usage<<"         -w:   write files"<<endl;
+  Usage<<"         -p:   output prefix"<<endl;
   Usage<<"         -h:   print this help"<<endl;
   Usage<<endl;
 
@@ -310,6 +327,9 @@ bool BinnedComptonImaging::ParseCommandLine(int argc, char** argv)
     } else if (Option == "-g") {
       m_ResponseGalacticFileName = argv[++i];
       cout<<"Accepting galactic response file name: "<<m_ResponseGalacticFileName<<endl;
+    } else if (Option == "-p") {
+      m_Prefix = argv[++i];
+      cout<<"Accepting output file name prefix: "<<m_Prefix<<endl;
     } else if (Option == "-i") {
       m_Iterations = atoi(argv[++i]);
       cout<<"Accepting iterations: "<<m_Iterations<<endl;
@@ -367,12 +387,6 @@ bool BinnedComptonImaging::ParseCommandLine(int argc, char** argv)
 bool BinnedComptonImaging::BuildBackgroundModel()
 { 
   mout<<endl<<"Starting to build background model..."<<endl;
-  
-  // Open the response file - which determines the data space grid...
-  if (m_Response.Read(m_ResponseFileName) == false) {
-    mgui<<"Cannot read response file: \""<<m_ResponseFileName<<"\""<<endl;
-    return false;
-  }
   
   MResponseMatrixON Model("Background Model");
   Model.AddAxis(m_Response.GetAxis(2)); // energy
@@ -445,9 +459,9 @@ bool BinnedComptonImaging::BuildBackgroundModel()
   MString FileName = m_ResponseFileName;
   FileName.ReplaceAllInPlace("imagingresponse", "backgroundmodel");
   if (FileName == m_ResponseFileName) {
-    FileName += ".backgroundmodel.rsp";
+    FileName += ".backgroundmodel.rsp.gz";
   }
-  Model.Write(FileName);
+  Model.Write(m_Prefix + FileName);
   
   return true;
 }
@@ -478,6 +492,20 @@ bool BinnedComptonImaging::PrepareResponse()
     mgui<<"Error: Cannot read response file: \""<<m_ResponseFileName<<"\""<<endl;
     return false;
   }
+  cout<<"Switching to non-sparse"<<endl;
+  m_Response.SwitchToNonSparse();
+  
+  // Retrieve some infor which will be lost later:
+  long Started = m_Response.GetSimulatedEvents();
+  m_StartArea = m_Response.GetFarFieldStartArea();
+  m_Steradians = 4*c_Pi / m_InitialDirectionBins;
+  if (m_StartArea == 0) {
+    cout<<"Error no start area given"<<endl;
+    return false;
+  }
+  
+  cout<<"Determining maximum phi:"<<endl;
+  // Create maximum populated phi-bin:
   
   m_InitialEnergyBins = m_Response.GetAxis(0).GetNumberOfBins();
   m_InitialDirectionBins = m_Response.GetAxis(1).GetNumberOfBins();
@@ -487,6 +515,93 @@ bool BinnedComptonImaging::PrepareResponse()
   m_FinalDirectionBins = m_Response.GetAxis(4).GetNumberOfBins();
   m_FinalElectronDirectionBins = m_Response.GetAxis(5).GetNumberOfBins();
   m_FinalDistanceBins = m_Response.GetAxis(6).GetNumberOfBins();
+  
+  unsigned long M1 = 1;
+  unsigned long M2 = M1*m_InitialEnergyBins;
+  unsigned long M3 = M2*m_InitialDirectionBins;
+  unsigned long M4 = M3*m_FinalEnergyBins;
+  unsigned long M5 = M4*m_FinalPhiBins;
+  unsigned long M6 = M5*m_FinalDirectionBins;
+  unsigned long M7 = M6*m_FinalElectronDirectionBins;
+  
+  m_MaxFinalPhiBin = 0;
+  for (unsigned int ie = 0; ie < m_InitialEnergyBins; ++ie) {
+    unsigned long B1 = M1*ie;
+    for (unsigned int id = 0; id < m_InitialDirectionBins; ++id) {
+      unsigned long B2 = B1 + M2*id;
+      for (unsigned int fe = 0; fe < m_FinalEnergyBins; ++fe) {
+        unsigned long B3 = B2 + M3*fe;
+        for (unsigned int fp = 0; fp < m_FinalPhiBins; ++fp) {
+          unsigned long B4 = B3 + M4*fp;
+          for (unsigned int fd = 0; fd < m_FinalDirectionBins; ++fd) {
+            unsigned long B5 = B4 + M5*fd;
+            for (unsigned int fed = 0; fed < m_FinalElectronDirectionBins; ++fed) {
+              unsigned long B6 = B5 + M6*fed;
+              for (unsigned int fdi = 0; fdi < m_FinalDistanceBins; ++fdi) {
+                unsigned long B7 = B6 + M7*fdi;
+                
+                if (m_Response.Get(B7) != 0) {
+                  if (fp >= m_MaxFinalPhiBin) m_MaxFinalPhiBin = fp+1; 
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  cout<<"Maximum phi bin: "<<m_MaxFinalPhiBin<<endl;
+  
+  /*
+  if (m_MaxFinalPhiBin+1 < m_Response.GetAxis(3).GetNumberOfBins()) {
+    cout<<"Simplifying response!"<<endl;
+    vector<double> Edges = m_Response.GetAxis(3).Get1DBinEdges();
+    Edges.resize(m_MaxFinalPhiBin+1);
+    
+    MResponseMatrixAxis PhiAxis("Phi axis - shrunk");
+    PhiAxis.SetBinEdges(Edges);
+    
+    MResponseMatrixON Response2;
+    Response2.SetName("Response - phi shortened");
+    Response2.AddAxis(m_Response.GetAxis(0)); // energy
+    Response2.AddAxis(m_Response.GetAxis(1)); // image space
+    Response2.AddAxis(m_Response.GetAxis(2)); // energy
+    Response2.AddAxis(PhiAxis); // phi
+    Response2.AddAxis(m_Response.GetAxis(4)); // direction scattered gamma ray 
+    Response2.AddAxis(m_Response.GetAxis(5)); // direction recoil electron 
+    Response2.AddAxis(m_Response.GetAxis(6)); // distance
+    
+    m_FinalPhiBins = Response2.GetAxis(3).GetNumberOfBins();
+
+    // Copy the data
+    for (unsigned int ie = 0; ie < m_InitialEnergyBins; ++ie) {
+      unsigned long B1 = M1*ie;
+      for (unsigned int id = 0; id < m_InitialDirectionBins; ++id) {
+        unsigned long B2 = B1 + M2*id;
+        for (unsigned int fe = 0; fe < m_FinalEnergyBins; ++fe) {
+          unsigned long B3 = B2 + M3*fe;
+          for (unsigned int fp = 0; fp < m_FinalPhiBins; ++fp) {
+            unsigned long B4 = B3 + M4*fp;
+            for (unsigned int fd = 0; fd < m_FinalDirectionBins; ++fd) {
+              unsigned long B5 = B4 + M5*fd;
+              for (unsigned int fed = 0; fed < m_FinalElectronDirectionBins; ++fed) {
+                unsigned long B6 = B5 + M6*fed;
+                for (unsigned int fdi = 0; fdi < m_FinalDistanceBins; ++fdi) {
+                  unsigned long B7 = B6 + M7*fdi;
+
+                  Response2.Set(B7, m_Response.Get(B7));
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    m_Response = Response2;
+  }
+  */
   
   //! The number of image sapce bins
   m_IBins = m_InitialEnergyBins * m_InitialDirectionBins;
@@ -499,37 +614,82 @@ bool BinnedComptonImaging::PrepareResponse()
   // Normalize response:
   // Each bin contains the ratio of detected vs. started photons
   
-  long Started = m_Response.GetSimulatedEvents();
-  m_StartArea = m_Response.GetFarFieldStartArea();
-  m_Steradians = 4*c_Pi / m_InitialDirectionBins;
-  if (m_StartArea == 0) {
-    cout<<"Error no start area given"<<endl;
-    return false;
-  }
-  
   // Emitted per bin -- area is constant per bin by definition!
   float Emitted = float(Started/m_InitialDirectionBins);
   
   MTimer T2;
   float MaxRatio = 0;
-  for (unsigned int ib = 0; ib < m_IBins; ++ib) {
-    for (unsigned long db = 0; db < m_DBins; ++db) {
-      float Ratio = m_Response.Get(ib + m_IBins*db) / Emitted;
-      m_Response.Set(ib + m_IBins*db, Ratio);
+  if (m_Response.IsSparse() == true) {
+    for (unsigned int sb = 0; sb < m_Response.GetNumberOfSparseBins(); ++sb) {
+      float Ratio = m_Response.GetSparse(sb) / Emitted;
+      m_Response.SetSparse(sb, Ratio);
       if (Ratio > MaxRatio) MaxRatio = Ratio;
+    }
+  } else {
+    for (unsigned int ib = 0; ib < m_IBins; ++ib) {
+      for (unsigned long db = 0; db < m_DBins; ++db) {
+        float Ratio = m_Response.Get(ib + m_IBins*db) / Emitted;
+        m_Response.Set(ib + m_IBins*db, Ratio);
+        if (Ratio > MaxRatio) MaxRatio = Ratio;
+      }
     }
   }
   cout<<"T2: "<<T2.GetElapsed()<<endl;
   
-  // Create an empty Galactic response
-  m_ResponseGalactic.SetName("Response Galactic");
+  
+  // Create speed up matrix:
+  
+  m_GalacticResponseSpeedUpMatrix.resize(m_RBins);
+  
+  M1 = 1;
+  M2 = M1*m_InitialEnergyBins;
+  M3 = M2*m_InitialDirectionBins;
+  M4 = M3*m_FinalEnergyBins;
+  M5 = M4*m_FinalPhiBins;
+  M6 = M5*m_FinalDirectionBins;
+  M7 = M6*m_FinalElectronDirectionBins;
+  
+  unsigned long GalBin = 0;
+  for (unsigned int ie = 0; ie < m_InitialEnergyBins; ++ie) {
+    unsigned long B1 = M1*ie;
+    for (unsigned int id = 0; id < m_InitialDirectionBins; ++id) {
+      unsigned long B2 = B1 + M2*id;
+      for (unsigned int fe = 0; fe < m_FinalEnergyBins; ++fe) {
+        unsigned long B3 = B2 + M3*fe;
+        for (unsigned int fp = 0; fp < m_MaxFinalPhiBin; ++fp) {
+          unsigned long B4 = B3 + M4*fp;
+          for (unsigned int fd = 0; fd < m_FinalDirectionBins; ++fd) {
+            unsigned long B5 = B4 + M5*fd;
+            for (unsigned int fed = 0; fed < m_FinalElectronDirectionBins; ++fed) {
+              unsigned long B6 = B5 + M6*fed;
+              for (unsigned int fdi = 0; fdi < m_FinalDistanceBins; ++fdi) {
+                unsigned long B7 = B6 + M7*fdi;
+                
+                m_GalacticResponseSpeedUpMatrix[GalBin] = B7;
+                ++GalBin;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  
+  
+  // Create an empty Galactic response with updated Galactic coordinates 
+	MResponseMatrixAxisSpheric Gal("Galactic Latitude [deg]", "Galactic Longitude [deg]");
+  Gal.SetFISBEL(m_Response.GetAxis(1).GetNumberOfBins(), m_LongitudeShift);
+	
+	m_ResponseGalactic.SetName("Response Galactic");
   m_ResponseGalactic.AddAxis(m_Response.GetAxis(0)); // energy
-  m_ResponseGalactic.AddAxis(m_Response.GetAxis(1)); // image space in GALACTIC coordinates
+  m_ResponseGalactic.AddAxis(Gal); // image space in GALACTIC coordinates
   m_ResponseGalactic.AddAxis(m_Response.GetAxis(2)); // energy
   m_ResponseGalactic.AddAxis(m_Response.GetAxis(3)); // phi
-  m_ResponseGalactic.AddAxis(m_Response.GetAxis(4)); // direction scattered gamma ray in GALACTIC coordinates
+  m_ResponseGalactic.AddAxis(Gal); // direction scattered gamma ray in GALACTIC coordinates
   m_ResponseGalactic.AddAxis(m_Response.GetAxis(5)); // direction recoil electron in GALACTIC coordinates
   m_ResponseGalactic.AddAxis(m_Response.GetAxis(6)); // distance
+  m_ResponseGalactic.SwitchToNonSparse();
   
   cout<<"Response preparation: finished"<<endl;
   
@@ -582,16 +742,19 @@ bool BinnedComptonImaging::PrepareDataSpace()
   
   // Create the data space
   m_Data.SetName("Data");
-  m_Data.AddAxis(m_Response.GetAxis(2)); // energy
-  m_Data.AddAxis(m_Response.GetAxis(3)); // phi
-  m_Data.AddAxis(m_Response.GetAxis(4)); // direction of scattered gamma ray in GALACTIC coordinates
-  m_Data.AddAxis(m_Response.GetAxis(5)); // direction of recoil electron in GALACTIC coordinates
-  m_Data.AddAxis(m_Response.GetAxis(6)); // distance
+  m_Data.AddAxis(m_ResponseGalactic.GetAxis(2)); // energy
+  m_Data.AddAxis(m_ResponseGalactic.GetAxis(3)); // phi
+  m_Data.AddAxis(m_ResponseGalactic.GetAxis(4)); // direction of scattered gamma ray in GALACTIC coordinates
+  m_Data.AddAxis(m_ResponseGalactic.GetAxis(5)); // direction of recoil electron in GALACTIC coordinates
+  m_Data.AddAxis(m_ResponseGalactic.GetAxis(6)); // distance
   
   // Create the pointing file
   m_Pointing.SetName("Pointing");
-  m_Pointing.AddAxis(m_Response.GetAxis(1)); // direction of scattered gamma ray in GALACTIC coordinates
-  m_Pointing.AddAxis(m_Response.GetAxis(4)); // direction of scattered gamma ray in GALACTIC coordinates
+  m_Pointing.AddAxis(m_ResponseGalactic.GetAxis(1)); // direction of scattered gamma ray in GALACTIC coordinates
+  m_Pointing.AddAxis(m_ResponseGalactic.GetAxis(4)); // direction of scattered gamma ray in GALACTIC coordinates
+  
+  MResponseMatrixON m_PointingZ;
+  m_PointingZ.AddAxis(m_ResponseGalactic.GetAxis(1));
   
   // Read configuration file
   MSettingsMimrec MimrecCfg(false);
@@ -641,14 +804,16 @@ bool BinnedComptonImaging::PrepareDataSpace()
       continue;        
     }
     
-    //! Set the pointing
-    m_Pointing.Add(vector<double>{ 90 + Event->GetGalacticPointingXAxisLatitude()*c_Deg, Event->GetGalacticPointingXAxisLongitude()*c_Deg, 90 + Event->GetGalacticPointingZAxisLatitude()*c_Deg, Event->GetGalacticPointingZAxisLongitude()*c_Deg } );
-    
     // Check if we have a good event
     if (EventSelector.IsQualifiedEventFast(Event) == false) {
       delete Event;
       continue;
     }
+    
+    //! Set the pointing
+    m_Pointing.Add(vector<double>{ 90 + Event->GetGalacticPointingXAxisLatitude()*c_Deg, Event->GetGalacticPointingXAxisLongitude()*c_Deg, 90 + Event->GetGalacticPointingZAxisLatitude()*c_Deg, Event->GetGalacticPointingZAxisLongitude()*c_Deg } );
+    m_PointingZ.Add(vector<double>{ 90 + Event->GetGalacticPointingZAxisLatitude()*c_Deg, Event->GetGalacticPointingZAxisLongitude()*c_Deg } );
+
     
     // Add Comptons to the data base
     if (Event->GetType() == MPhysicalEvent::c_Compton) {
@@ -731,8 +896,8 @@ bool BinnedComptonImaging::PrepareDataSpace()
   cout<<"Pointing - sum: "<<m_Pointing.GetSum()<<endl;
   
   if (m_WriteFiles == true) {
-    m_Pointing.Write("Pointing.rsp");
-    m_Data.Write("Data.rsp");
+    m_Pointing.Write(m_Prefix + "Pointing.rsp.gz");
+    m_Data.Write(m_Prefix + "Data.rsp.gz");
   }
   
   cout<<"Data space preparation: finished with "<<m_Data.GetSum()<<" events"<<endl;
@@ -741,12 +906,14 @@ bool BinnedComptonImaging::PrepareDataSpace()
 }
 
 
-
 /******************************************************************************
  * Parallel response rotation
  */
 bool BinnedComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ)
 { 
+  
+  vector<unsigned long> Bins;
+  vector<float> Values;
   
   for (unsigned int b = 0; b < PointingBinsX.size(); ++b) {
     
@@ -759,82 +926,126 @@ bool BinnedComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vecto
     // Then create the rotation
     vector<double> XPointing = m_Pointing.GetAxis(0).GetBinCenters(PointingBinsX[b]);
     vector<double> ZPointing = m_Pointing.GetAxis(1).GetBinCenters(PointingBinsZ[b]);
-    cout<<XPointing[0]<<":"<<XPointing[1]<<endl;
-    cout<<ZPointing[0]<<":"<<ZPointing[1]<<endl;
+    //cout<<XPointing[0]<<":"<<XPointing[1]<<endl;
+    //cout<<ZPointing[0]<<":"<<ZPointing[1]<<endl;
     
     MRotationInterface RI;
     RI.SetGalacticPointingXAxis(XPointing[1], XPointing[0]-90); // Convert to Galactic 
     RI.SetGalacticPointingZAxis(ZPointing[1], ZPointing[0]-90); // Convert to Galactic 
-    MRotation R = RI.GetGalacticPointingInverseRotationMatrix(); //  good - 1 sigma width of point source 27.7 deg
-    //MRotation R = RI.GetGalacticPointingRotationMatrix(); // definitely wrong when looking at an ideal point source
+    MRotation RInv = RI.GetGalacticPointingInverseRotationMatrix(); //  good - 1 sigma width of point source 27.7 deg
+    MRotation R = RI.GetGalacticPointingRotationMatrix(); // definitely wrong when looking at an ideal point source
     
-    cout<<"R (p): "<<R<<endl;
+    //cout<<"R (p): "<<R<<endl;
     
     // Precalculate the rotation map
     // --> Problem: Some map to the same bin...
-    vector<unsigned int> RotatedBinMapping;
+    vector<unsigned int> RotatedBinMappingGalacticToLocal;
+    vector<unsigned int> RotatedBinMappingLocalToGalactic;
     for (unsigned int id = 0; id < m_InitialDirectionBins; ++id) {
       // Calculate the new detector pointing
       vector<double> GalacticPointing = m_ResponseGalactic.GetAxis(1).GetBinCenters(id);
       //cout<<GalacticPointing[0]<<":"<<GalacticPointing[1]<<endl;
       MVector GalIn;
       GalIn.SetMagThetaPhi(1.0, GalacticPointing[0]*c_Rad, GalacticPointing[1]*c_Rad);
-      MVector LocalIn = R*GalIn;
+      MVector LocalIn = RInv*GalIn;
       
       //cout<<R*GalIn<<" vs. "<<R2*GalIn<<" --> "<<LocalIn.Angle(R2*GalIn)*c_Deg<<endl;
       
       // Find that bin in the new response:
-      RotatedBinMapping.push_back(m_Response.GetAxis(1).GetAxisBin(LocalIn.Theta()*c_Deg, LocalIn.Phi()*c_Deg));
+      RotatedBinMappingGalacticToLocal.push_back(m_Response.GetAxis(1).GetAxisBin(LocalIn.Theta()*c_Deg, LocalIn.Phi()*c_Deg));
       
       // cout<<"Mapping: "<<id<<"->"<<RotatedBinMapping[id]<<endl;
+      
+      vector<double> LocalPointing = m_ResponseGalactic.GetAxis(1).GetBinCenters(id); // Same as above GalacticPointing
+      LocalIn.SetMagThetaPhi(1.0, LocalPointing[0]*c_Rad, LocalPointing[1]*c_Rad);
+      GalIn = R*LocalIn;
+      RotatedBinMappingLocalToGalactic.push_back(m_Response.GetAxis(1).GetAxisBin(GalIn.Theta()*c_Deg, GalIn.Phi()*c_Deg));      
     }
     
     
-    // Loop over the new response...
-    //! Logic: a1 + S1*a2 + S1*S2*a3 + S1*S2*S3*a4 + S1*S2*S3*S4*a5  
-    unsigned long M1 = 1;
-    unsigned long M2 = M1*m_InitialEnergyBins;
-    unsigned long M3 = M2*m_InitialDirectionBins;
-    unsigned long M4 = M3*m_FinalEnergyBins;
-    unsigned long M5 = M4*m_FinalPhiBins;
-    unsigned long M6 = M5*m_FinalDirectionBins;
-    unsigned long M7 = M6*m_FinalElectronDirectionBins;
+    // Loop over the new response to make sure that there are no gaps
+    // --> Cannot be done in sparse mode
     
-    for (unsigned int ie = 0; ie < m_InitialEnergyBins; ++ie) {
-      unsigned long A1 = M1*ie;
-      unsigned long B1 = M1*ie;
-      for (unsigned int id = 0; id < m_InitialDirectionBins; ++id) {
-        unsigned long A2 = A1 + M2*RotatedBinMapping[id];
-        unsigned long B2 = B1 + M2*id;
+    if (m_Response.IsSparse() == true) {
+      for (unsigned long sb = 0; sb < m_Response.GetNumberOfSparseBins(); ++sb) {
+        vector<unsigned long> Bins = m_Response.FindBinsSparse(sb);
+        Bins[1] = RotatedBinMappingLocalToGalactic[Bins[1]];
+        Bins[4] = RotatedBinMappingLocalToGalactic[Bins[4]];        
+        //Bins[5] = RotatedBinMappingLocalToGalactic[Bins[5]];
         
-        for (unsigned int fe = 0; fe < m_FinalEnergyBins; ++fe) {
-          unsigned long A3 = A2 + M3*fe;
-          unsigned long B3 = B2 + M3*fe;
-          for (unsigned int fp = 0; fp < m_FinalPhiBins; ++fp) {
-            unsigned long A4 = A3 + M4*fp;
-            unsigned long B4 = B3 + M4*fp;
-            for (unsigned int fd = 0; fd < m_FinalDirectionBins; ++fd) {
-              unsigned long A5 = A4 + M5*RotatedBinMapping[fd];
-              unsigned long B5 = B4 + M5*fd;
-              for (unsigned int fed = 0; fed < m_FinalElectronDirectionBins; ++fed) {
-                unsigned long A6 = A5 + M6*fed;
-                unsigned long B6 = B5 + M6*fed;
-                for (unsigned int fdi = 0; fdi < m_FinalDistanceBins; ++fdi) {
-                  
-                  unsigned int long A7 = A6 + M7*fdi;
-                  unsigned int long B7 = B6 + M7*fdi;
-                  
-                  double ResponseData = m_Response.Get(A7)*PointingScaler; // Normalize by time in pointing  
-                  if (ResponseData == 0) continue;
-                  
-                  m_ThreadMutex.lock();
-                  m_ResponseGalactic.Add(B7, ResponseData); 
-                  m_ThreadMutex.unlock();
+        unsigned long Bin = m_ResponseGalactic.FindBin(Bins); // this and ...
+        float Value = m_Response.GetSparse(sb)*PointingScaler; // this can be parallelized, but not add 
+        
+        m_ThreadMutex.lock();
+        m_ResponseGalactic.Add(Bin, Value); 
+        m_ThreadMutex.unlock();
+      }
+    } else {
+      //! Logic: a1 + S1*a2 + S1*S2*a3 + S1*S2*S3*a4 + S1*S2*S3*S4*a5  
+      unsigned long M1 = 1;
+      unsigned long M2 = M1*m_InitialEnergyBins;
+      unsigned long M3 = M2*m_InitialDirectionBins;
+      unsigned long M4 = M3*m_FinalEnergyBins;
+      unsigned long M5 = M4*m_FinalPhiBins;
+      unsigned long M6 = M5*m_FinalDirectionBins;
+      unsigned long M7 = M6*m_FinalElectronDirectionBins;
+      
+      unsigned long GalBin = 0;
+      for (unsigned int ie = 0; ie < m_InitialEnergyBins; ++ie) {
+        unsigned long A1 = M1*ie;
+        //unsigned long B1 = M1*ie;
+        for (unsigned int id = 0; id < m_InitialDirectionBins; ++id) {
+          unsigned long A2 = A1 + M2*RotatedBinMappingGalacticToLocal[id];
+          //unsigned long B2 = B1 + M2*id;
+          
+          for (unsigned int fe = 0; fe < m_FinalEnergyBins; ++fe) {
+            unsigned long A3 = A2 + M3*fe;
+            //unsigned long B3 = B2 + M3*fe;
+            for (unsigned int fp = 0; fp < m_MaxFinalPhiBin; ++fp) {
+              unsigned long A4 = A3 + M4*fp;
+              //unsigned long B4 = B3 + M4*fp;
+              for (unsigned int fd = 0; fd < m_FinalDirectionBins; ++fd) {
+                unsigned long A5 = A4 + M5*RotatedBinMappingGalacticToLocal[fd];
+                //unsigned long B5 = B4 + M5*fd;
+                for (unsigned int fed = 0; fed < m_FinalElectronDirectionBins; ++fed) {
+                  unsigned long A6 = A5 + M6*fed; // TODO: <--- the rotation needs to be added here too at some point 
+                  //unsigned long B6 = B5 + M6*fed;
+                  for (unsigned int fdi = 0; fdi < m_FinalDistanceBins; ++fdi) {
+                    
+                    unsigned long A7 = A6 + M7*fdi;
+                    //unsigned long B7 = B6 + M7*fdi;
+                    
+                    double ResponseData = m_Response.Get(A7)*PointingScaler; // Normalize by time in pointing  
+                    if (ResponseData == 0) {
+                      ++GalBin;
+                      continue;
+                    }
+                    
+                    Bins.push_back(m_GalacticResponseSpeedUpMatrix[GalBin]);
+                    ++GalBin;
+                    
+                    Values.push_back(ResponseData);
+                  }
                 }
               }
             }
           }
+          
+          // Just try to lock and store the data
+          if (m_ThreadMutex.try_lock() == true) {
+            m_ResponseGalactic.Add(Bins, Values);
+            m_ThreadMutex.unlock();
+            Bins.clear();
+            Values.clear();
+          }
         }
+        
+        // Definitely store the data here
+        m_ThreadMutex.lock();
+        m_ResponseGalactic.Add(Bins, Values);
+        m_ThreadMutex.unlock();
+        Bins.clear();
+        Values.clear();
       }
     }
   }
@@ -851,6 +1062,9 @@ bool BinnedComptonImaging::RotateResponseInParallel(unsigned int ThreadID, vecto
 bool BinnedComptonImaging::CreateGalacticResponse()
 {  
   cout<<endl<<"Creation of response in Galactic coordinates: started"<<endl;
+  
+  MTimer Timer;
+  
   
   // Step 0: If we should load it, then just load it
   if (m_ResponseGalacticFileName != "") {
@@ -896,6 +1110,9 @@ bool BinnedComptonImaging::CreateGalacticResponse()
     m_ThreadRunning.resize(1, true);
     RotateResponseInParallel(0, PointingBinsX, PointingBinsZ);
   } else {
+    
+    Split += 1; // so that the last thread does not get an excess of pointings
+    
     vector<thread> Threads(std::thread::hardware_concurrency());
     m_ThreadRunning.resize(Threads.size(), true);
     for (unsigned int t = 0; t < Threads.size(); ++t) {
@@ -904,6 +1121,7 @@ bool BinnedComptonImaging::CreateGalacticResponse()
       vector<unsigned int> Z(PointingBinsZ.begin() + t*Split, (t == Threads.size() - 1) ? PointingBinsZ.end() : PointingBinsZ.begin() + (t+1)*Split);
       Threads[t] = thread(&BinnedComptonImaging::RotateResponseInParallel, this, t, X, Z);
     }
+    
     while (true) {
       bool Finished = true;
       for (unsigned int t = 0; t < Threads.size(); ++t) {
@@ -927,11 +1145,13 @@ bool BinnedComptonImaging::CreateGalacticResponse()
   
   if (m_WriteFiles == true) {
     cout<<endl<<"Writing rotated response"<<endl;
-    m_ResponseGalactic.Write("ResponseGalactic.rsp");
+    m_ResponseGalactic.Write(m_Prefix + "ResponseGalactic.rsp.gz");
   }
   
   cout<<"Number of directions in pointings file: "<<Dirs<<endl;
   cout<<"Response Galactic normalization: "<<m_ResponseGalactic.GetSum()<<"  vs. "<<m_Response.GetSum()<<endl;
+  cout<<endl;
+  cout<<"Galactic response created in "<<Timer.GetElapsed()<<" seconds"<<endl;
   
   return true;
 }
@@ -942,7 +1162,9 @@ bool BinnedComptonImaging::CreateGalacticResponse()
  */
 bool BinnedComptonImaging::RotateBackgroundModelInParallel(unsigned int ThreadID, unsigned int ModelID, vector<unsigned int> PointingBinsX, vector<unsigned int> PointingBinsZ)
 { 
-  // For all poitnings...
+  // For all pointings...
+
+  
   for (unsigned int b = 0; b < PointingBinsX.size(); ++b) {
     
     cout<<"Thread #"<<ThreadID<<": "<<b+1<<"/"<<PointingBinsX.size()<<endl;
@@ -1054,12 +1276,16 @@ bool BinnedComptonImaging::CreateGalacticBackgroundModel()
        mgui<<"Error: The response and background model axes arre not identical"<<endl;
         return false;
       }
-        
+      
+			MResponseMatrixAxisSpheric A("Galactic Latitude [deg]", "Galactic Longitude [deg]");
+			A.SetFISBEL(m_BackgroundModel[b].GetAxis(2).GetNumberOfBins(), m_LongitudeShift);
+
+
       m_BackgroundModelGalactic[b].SetName(MString("Background model in Galactic coordiantes #") + (b+1));
       m_BackgroundModelGalactic[b].AddAxis(m_BackgroundModel[b].GetAxis(0)); // energy
       m_BackgroundModelGalactic[b].AddAxis(m_BackgroundModel[b].GetAxis(1)); // phi
-      m_BackgroundModelGalactic[b].AddAxis(m_BackgroundModel[b].GetAxis(2)); // direction of scattered gamma ray IN GALACTIC coordinates
-      m_BackgroundModelGalactic[b].AddAxis(m_BackgroundModel[b].GetAxis(3)); // direction of recoil electron IN GALACTIC coordinates
+      m_BackgroundModelGalactic[b].AddAxis(A); // direction of scattered gamma ray IN GALACTIC coordinates
+      m_BackgroundModelGalactic[b].AddAxis(A); // direction of recoil electron IN GALACTIC coordinates
       m_BackgroundModelGalactic[b].AddAxis(m_BackgroundModel[b].GetAxis(4)); // distance
     }
     
@@ -1128,7 +1354,7 @@ bool BinnedComptonImaging::CreateGalacticBackgroundModel()
     if (m_WriteFiles == true) {
       cout<<"Writing rotated Galactic background"<<endl;
       for (unsigned int b = 0; b < m_BackgroundModel.size(); ++b) { 
-        m_BackgroundModelGalactic[b].Write(MString("BackgroundModelGalactic_model") + b + ".rsp");
+        m_BackgroundModelGalactic[b].Write(m_Prefix + MString("BackgroundModelGalactic_model") + b + ".rsp.gz");
       }
     }
     for (unsigned int b = 0; b < m_BackgroundModel.size(); ++b) { 
@@ -1146,8 +1372,8 @@ bool BinnedComptonImaging::CreateGalacticBackgroundModel()
 bool BinnedComptonImaging::CreateExposureMap()
 {
   m_ExposureMap.SetName("ExposureMap");
-  m_ExposureMap.AddAxis(m_Response.GetAxis(0)); // energy
-  m_ExposureMap.AddAxis(m_Response.GetAxis(1)); // image space
+  m_ExposureMap.AddAxis(m_ResponseGalactic.GetAxis(0)); // energy
+  m_ExposureMap.AddAxis(m_ResponseGalactic.GetAxis(1)); // image space
   
   
   for (unsigned int ib = 0; ib < m_IBins; ++ib) {
@@ -1160,10 +1386,10 @@ bool BinnedComptonImaging::CreateExposureMap()
   
   if (m_WriteFiles == true) {
     cout<<"Writing exposure map"<<endl;
-    m_ExposureMap.Write("ExposureMap.rsp");
+    m_ExposureMap.Write(m_Prefix + "ExposureMap.rsp.gz");
   }
   
-  ShowImageGalacticCoordinates(m_ExposureMap, "Exposure", "cm^2 * sec");
+  ShowImageGalacticCoordinates(m_ExposureMap, "Exposure", "cm^2 * sec", true, m_Prefix + "Exposure");
   
   return true;
 }
@@ -1178,8 +1404,8 @@ bool BinnedComptonImaging::ReconstructRL()
   cout<<"Creating initial backprojection..."<<endl;
   
   MResponseMatrixON Image("Image");
-  Image.AddAxis(m_Response.GetAxis(0)); // energy
-  Image.AddAxis(m_Response.GetAxis(1)); // image space
+  Image.AddAxis(m_ResponseGalactic.GetAxis(0)); // energy
+  Image.AddAxis(m_ResponseGalactic.GetAxis(1)); // image space
 
   MTimer T;
   
@@ -1206,7 +1432,7 @@ bool BinnedComptonImaging::ReconstructRL()
 
   // Show & write
   if (m_WriteFiles == true) {
-    Image.Write("FirstBackprojection.rsp");
+    Image.Write(m_Prefix + "FirstBackprojection.rsp.gz");
   }
 
   ShowImageGalacticCoordinates(Image, "1st backprojection", "[a.u.]");
@@ -1302,7 +1528,7 @@ bool BinnedComptonImaging::ReconstructRL()
     cout<<"Sums:  mean="<<Mean.GetSum()<<" image="<<Image.GetSum()<<"  data="<<m_Data.GetSum()<<endl;
     cout<<"Image content: "<<ImageFlux<<" ph/cm2/s for T="<<m_ObservationTime<<" sec and A="<<m_StartArea<<" cm^2"<<endl;
     
-    ShowImageGalacticCoordinates(Image, MString("RL image at iteration ") + (i+1) + " with flux " + ImageFlux + " ph/cm2/s", "Flux", true);
+    ShowImageGalacticCoordinates(Image, MString("RL image at iteration ") + (i+1) + " with flux " + ImageFlux + " ph/cm2/s", "Flux", true, m_Prefix + MString("RL image at iteration ") + (i+1));
     
     if (m_Interrupt == true) break;
   }  
@@ -1318,7 +1544,7 @@ bool BinnedComptonImaging::ReconstructMEM()
 {
     // Set up Lagrange multipliers
   
-  MResponseMatrixON Lagrange;
+  MResponseMatrixON Lagrange(false);
   Lagrange.AddAxis(m_ResponseGalactic.GetAxis(2)); // energy
   Lagrange.AddAxis(m_ResponseGalactic.GetAxis(3)); // phi
   Lagrange.AddAxis(m_ResponseGalactic.GetAxis(4)); // direction scattered gamma ray  
@@ -1337,7 +1563,7 @@ bool BinnedComptonImaging::ReconstructMEM()
   cout<<"Data Sum="<<DataSum<<endl;   
   
   // The expectations
-  MResponseMatrixON Expectation;
+  MResponseMatrixON Expectation(false);
   Expectation.AddAxis(m_ResponseGalactic.GetAxis(2)); // energy
   Expectation.AddAxis(m_ResponseGalactic.GetAxis(3)); // phi
   Expectation.AddAxis(m_ResponseGalactic.GetAxis(4)); // diretcion scattered gamma ray  
@@ -1352,9 +1578,9 @@ bool BinnedComptonImaging::ReconstructMEM()
     
     // Step 1: Calculate the restored image:
     
-    MResponseMatrixON RestoredImage("RestoredImage");
-    RestoredImage.AddAxis(m_Response.GetAxis(0)); // energy
-    RestoredImage.AddAxis(m_Response.GetAxis(1)); // image space      
+    MResponseMatrixON RestoredImage("RestoredImage", false);
+    RestoredImage.AddAxis(m_ResponseGalactic.GetAxis(0)); // energy
+    RestoredImage.AddAxis(m_ResponseGalactic.GetAxis(1)); // image space      
     
     double RestoredImageSum = 0;
     
@@ -1483,9 +1709,9 @@ bool BinnedComptonImaging::ReconstructMEM()
     
     
     // Step 5: Update the real image:
-    MResponseMatrixON NewImage("NewImage");
-    NewImage.AddAxis(m_Response.GetAxis(0)); // energy
-    NewImage.AddAxis(m_Response.GetAxis(1)); // image space
+    MResponseMatrixON NewImage("NewImage", false);
+    NewImage.AddAxis(m_ResponseGalactic.GetAxis(0)); // energy
+    NewImage.AddAxis(m_ResponseGalactic.GetAxis(1)); // image space
     
     double ImageFlux = 0;
     for (unsigned int ib = 0; ib < m_IBins; ++ib) {
@@ -1498,7 +1724,8 @@ bool BinnedComptonImaging::ReconstructMEM()
       MaximumEntropy = Entropy;
     }
     
-    ShowImageGalacticCoordinates(NewImage, MString("MEM image at iteration ") + (i+1) + " with flux " + ImageFlux + " ph/cm2/s", "Flux", true);
+    ShowImageGalacticCoordinates(NewImage, MString("MEM image at iteration ") + (i+1), "Flux", true, m_Prefix + MString("MEM image at iteration ") + (i+1));
+    //ShowImageGalacticCoordinates(NewImage, MString("MEM image at iteration ") + (i+1) + " with flux " + ImageFlux + " ph/cm2/s", "Flux", true, MString("MEM image at iteration ") + (i+1));
     
     if (m_Interrupt == true) break;
     
@@ -1513,16 +1740,16 @@ bool BinnedComptonImaging::ReconstructMEM()
  */
 bool BinnedComptonImaging::Reconstruct()
 {
+  // Prepare the response and all helper information
+  if (PrepareResponse() == false) {
+    return false;
+  }
+  
   // Check if we have to build a background model
   if (m_JustBuildBackgroundModel == true) {
     BuildBackgroundModel();
     exit(0);
   }  
-  
-  // Prepare the response and all helper information
-  if (PrepareResponse() == false) {
-    return false;
-  }
   
   // Fill data space / create the response slices
   if (PrepareDataSpace() == false) {
@@ -1558,7 +1785,7 @@ bool BinnedComptonImaging::Reconstruct()
 /******************************************************************************
  * Show an image in Galactic coordinates
  */
-bool BinnedComptonImaging::ShowImageGalacticCoordinates(MResponseMatrixON Image, MString Title, MString zAxis, bool Save)
+bool BinnedComptonImaging::ShowImageGalacticCoordinates(MResponseMatrixON Image, MString Title, MString zAxis, bool Save, MString SaveTitle)
 {
   vector<double> ImageData(Image.GetAxis(1).GetNumberOfBins());
   for (unsigned int ib = 0; ib < m_IBins; ++ib) {
@@ -1570,16 +1797,27 @@ bool BinnedComptonImaging::ShowImageGalacticCoordinates(MResponseMatrixON Image,
   G->SetXAxisTitle("Galactic Longitude [deg]");
   G->SetYAxisTitle("Galactic Latitude [deg]");
   G->SetValueAxisTitle(zAxis);
-  G->SetDrawOption(MImage::c_COLZ);
+  G->SetDrawOption(MImage::c_COL);
   G->SetSpectrum(MImage::c_Rainbow);
   //G->SetSourceCatalog("$(MEGALIB)/resource/catalogs/Crab.scat");
   //G->SetProjection(MImageProjection::c_Hammer);
   G->Normalize(false);
-  G->SetFISBEL(ImageData);
+  G->SetFISBEL(ImageData, m_LongitudeShift);
   G->Display();
   
   if (Save == true) {
-    G->SaveAs(Title);
+    MString Save = SaveTitle;
+		Save += ".C";
+		Save.ReplaceAllInPlace(" ", "_");
+		G->SaveAs(Save);
+    Save = SaveTitle;
+		SaveTitle += ".eps";
+		SaveTitle.ReplaceAllInPlace(" ", "_");
+		G->SaveAs(SaveTitle);
+    Save = SaveTitle;
+		SaveTitle += ".png";
+		SaveTitle.ReplaceAllInPlace(" ", "_");
+		G->SaveAs(SaveTitle);
   }
   
   gSystem->ProcessEvents();
@@ -1642,7 +1880,7 @@ int main(int argc, char** argv)
     return -2;
   } 
 
-  BinnedComptonImagingApp.Run();
+  //BinnedComptonImagingApp.Run();
 
   cout<<"Program exited normally!"<<endl;
 

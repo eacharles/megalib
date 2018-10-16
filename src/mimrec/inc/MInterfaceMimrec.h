@@ -110,6 +110,8 @@ class MInterfaceMimrec : public MInterface
   void ARMResponseComparison();
   void AngularResolutionPairs();
   void AngularResolutionVsQualityFactorPair();
+  //! The resolution measure for PET events
+  void ResolutionMeasurePET();
 
   void EnergySpectra();
   
@@ -192,7 +194,7 @@ private:
   // private members:
  private:
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MInterfaceMimrec, 0) // image reconstruction management class 
 #endif

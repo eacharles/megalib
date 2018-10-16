@@ -28,7 +28,8 @@ using namespace std;
 #include "MResponseMatrixAxis.h"
 
 // ROOT libs:
-#include <TGraph.h>
+#include "TGraph.h"
+#include "TVirtualStreamerInfo.h" // Required for the ROOt streamer
 
 // Forward declarations:
 
@@ -45,12 +46,15 @@ class MResponseMatrixON : public MResponseMatrix
   MResponseMatrixON(bool IsParse = false);
   //! Default constructor with response name
   MResponseMatrixON(const MString& Name, bool IsParse = false);
-  //! DEfault destructor
+  //! Default destructor
   virtual ~MResponseMatrixON();
   
   //! Clear all data
   virtual void Clear();
 
+  //! True if the matrix is sparse
+  bool IsSparse() const { return m_IsSparse; }
+  
   //! Switch to sparse mode 
   void SwitchToSparse();
   //! Switch to non-sparse mode
@@ -89,6 +93,9 @@ class MResponseMatrixON : public MResponseMatrix
   //! Return the number of bins
   virtual unsigned long GetNBins() const { return m_NumberOfBins; }
   
+  //! Return the number of sparse bins
+  virtual unsigned long GetNumberOfSparseBins() const { return m_BinsSparse.size(); }
+  
   //! Return the number of axes
   unsigned int GetNumberOfAxes() { return m_Axes.size(); }
   
@@ -107,7 +114,13 @@ class MResponseMatrixON : public MResponseMatrix
   unsigned long FindBin(vector<unsigned long> X) const;
   //! Find the bin of m_Values corresponding to the axis values X
   unsigned long FindBin(vector<double> X) const;
-
+  
+  //! Find the axes bins corresponding to the axis values X
+  vector<unsigned long> FindBins(vector<double> X) const;
+  //! Find the axes bins corresponding to the internal value bin Bin
+  vector<unsigned long> FindBins(unsigned long Bin) const;
+  //! Find the axes bins corresponding to the sparse Bin
+  vector<unsigned long> FindBinsSparse(unsigned long SparseBin) const;
   
   // Interface to modify the content
   
@@ -129,6 +142,16 @@ class MResponseMatrixON : public MResponseMatrix
   //! Add to the content of a specific bin -- directly without error checks
   //! Logic: a1 + S1*a2 + S1*S2*a3 + S1*S2*S3*a4 + ....  
   void Add(unsigned long Bin, float Value = 1);
+  //! Add a collection of bin values
+  void Add(vector<unsigned long> Bins, vector<float> Values);
+  
+  // Specific for sparse
+  
+  //! Set the content of a sparse bin
+  void SetSparse(unsigned long SparseBin, float Value = 1);
+  //! Add to the content of a sparse bin
+  void AddSparse(unsigned long SparseBin, float Value = 1);
+  
   
   // Interface to retrieve the content
 
@@ -143,6 +166,11 @@ class MResponseMatrixON : public MResponseMatrix
   virtual float Get(vector<double> AxisValues) const;
   //! Get the interpolated content of the bin corresponding to the specific value
   virtual float GetInterpolated(vector<double> AxisValues, bool DoExtrapolate = false) const;
+  
+  // Specific for sparse
+  
+  //! Set the content of a sparse bin
+  virtual float GetSparse(unsigned long SparseBin) const;
   
   
   // Interface to the axes:
@@ -181,10 +209,6 @@ class MResponseMatrixON : public MResponseMatrix
   //! Read the specific data of this class - the main file handling is done in the base class!
   virtual bool ReadSpecific(MFileResponse& Parser, const MString& Type, const int Version);
 
-  //! Find the axes bins corresponding to the axis values X
-  vector<unsigned long> FindBins(vector<double> X) const;
-  //! Find the axes bins corresponding to the internal value bin Bin
-  vector<unsigned long> FindBins(unsigned long Bin) const;
   
   //! Sort the sparse matrix
   void SortSparse();
@@ -200,8 +224,10 @@ class MResponseMatrixON : public MResponseMatrix
   //! The number of bins
   unsigned long m_NumberOfBins;
    
-   //! The axes
+  //! The axes
   vector<MResponseMatrixAxis*> m_Axes;
+  //! The number of axes - just for speed up
+  unsigned int m_NumberOfAxes;
   
   //! Flag indicating that we are in sparse mode
   bool m_IsSparse;
@@ -220,9 +246,9 @@ class MResponseMatrixON : public MResponseMatrix
   friend ostream& operator<<(ostream& os, const MResponseMatrixON& R);
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
-  ClassDef(MResponseMatrixON, 1) // response matrix of order 1 (linear)
+  ClassDef(MResponseMatrixON, 1) 
 #endif
 
 };

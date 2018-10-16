@@ -44,7 +44,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MBackprojectionFarField)
 #endif
 
@@ -761,7 +761,7 @@ bool MBackprojectionFarField::BackprojectionCompton(double* Image, int* Bins, in
       if (m_ApproximatedMaths == false) {
         Image[i] *= m_Efficiency->Get(D.Theta(), D.Phi());
       } else {
-        Image[i] *= m_Efficiency->Get(D.ThetaFastMath(), D.PhiFastMath());        
+        Image[i] *= m_Efficiency->Get(D.ThetaApproximateMaths(), D.PhiApproximateMaths());        
       }
       InnerSum += Image[i];
       
@@ -861,6 +861,8 @@ bool MBackprojectionFarField::BackprojectionPhoto(double* Image, int* Bins, int&
 
 
 ////////////////////////////////////////////////////////////////////////////////
+
+
 
 
 bool MBackprojectionFarField::BackprojectionPair(double* Image, int* Bins, int& NUsedBins, double& Maximum)

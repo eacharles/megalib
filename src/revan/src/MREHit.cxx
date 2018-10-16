@@ -40,10 +40,11 @@ using namespace std;
 #include "MStreams.h"
 #include "MTokenizer.h"
 
+
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MREHit)
 #endif
 
@@ -139,39 +140,32 @@ bool MREHit::ParseLine(MString HitString, int Version)
       m_IsValid = true;
       m_FixedResolutions = true;
     }
-  } else if (Version == 4) { // MEGA Duke evta file:
+  } else if (Version == 4) { // The original MEGA Duke format:
     MTokenizer T(HitString, ';', false);
     if (T.GetNTokens() == 10) {
       sscanf(T.GetTokenAt(0), "HT%*4s%d", &m_Detector);
-      m_Position.SetXYZ(T.GetTokenAtAsDouble(1),
-                        T.GetTokenAtAsDouble(2),
-                        T.GetTokenAtAsDouble(3));
-      m_PositionResolution.SetXYZ(T.GetTokenAtAsDouble(6),
-                                  T.GetTokenAtAsDouble(7),
-                                  T.GetTokenAtAsDouble(8));
+      m_Position.SetXYZ(T.GetTokenAtAsDouble(1), T.GetTokenAtAsDouble(2), T.GetTokenAtAsDouble(3));
+      m_PositionResolution.SetXYZ(T.GetTokenAtAsDouble(6), T.GetTokenAtAsDouble(7), T.GetTokenAtAsDouble(8));
       m_Energy = T.GetTokenAtAsDouble(4);
       m_EnergyResolution = T.GetTokenAtAsDouble(9);
       m_IsValid = true;
       if (T.GetTokenAt(5) != "OK") {
         if (T.GetTokenAt(5).Contains("OF") == true) {
-          m_IsValid = true;  //Take OverFlow because we're interested in Pairs
-        } else if (T.GetTokenAt(5).Contains("BA") == true ||
-                   T.GetTokenAt(5).Contains("XO") == true ||
-                   T.GetTokenAt(5).Contains("YO") == true) {
+          m_IsValid = true; // Just an overflow 
+        } else if (T.GetTokenAt(5).Contains("BA") == true || 
+          T.GetTokenAt(5).Contains("XO") == true || 
+          T.GetTokenAt(5).Contains("YO") == true) {
           m_IsValid = false;
         }
       }
     } else {
       m_IsValid = false;
-      m_SubElementType = MRESE::c_Unknown;
-      merr<<"Unable to read HT:"<<endl
-          <<HitString<<endl;
     }
   } else {
     merr<<"Unknown version of sim/evta file (Version from file: "<<Version<<"), please upgrade (or use old version of MEGAlib prior to 3.0)"<<endl;
-    return false;
-    }
-
+    m_IsValid = false;
+  }
+  
   return m_IsValid;
 }
 
@@ -183,7 +177,7 @@ MREHit::MREHit(MREHit *Hit) : MRESE((MRESE *) Hit)
 {
   // Special copy-constructor
 
-  m_IsValid = Hit->m_IsValid;
+  m_IsValid = Hit->m_IsValid; 
   m_SubElementType = MRESE::c_Hit;
   m_FixedResolutions = Hit->m_FixedResolutions;
 }

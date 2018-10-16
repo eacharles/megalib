@@ -46,7 +46,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MFileEventsEvta)
 #endif
 
@@ -98,19 +98,24 @@ bool MFileEventsEvta::Open(MString FileName, unsigned int Way)
   m_IncludeFileUsed = false;
   m_IncludeFile = new MFileEventsEvta(m_Geometry);
   m_IncludeFile->SetIsIncludeFile(true);
-
+  
+  if (FileName.EndsWith("sim") == false && FileName.EndsWith("sim.gz") == false && FileName.EndsWith("evta") == false && FileName.EndsWith("evta.gz") == false) {
+    merr<<"This file is neither sim nor evta file: "<<FileName<<endl;
+    return false;    
+  }
+  
   if (FileName.EndsWith("sim") == true || FileName.EndsWith("sim.gz") == true) {
     m_IsSimulation = true;
   } else {
     m_IsSimulation = false;
   }
-
+  
   if (MFileEvents::Open(FileName, Way) == false) {
     return false;
   }
-
+  
   if (m_Geometry->IsScanned() == false) {
-    mout<<"We do not have a properly initialized geometry!"<<endl;
+    merr<<"We do not have a properly initialized geometry!"<<endl;
     return false;
   }
 
@@ -229,7 +234,7 @@ MRERawEvent* MFileEventsEvta::GetNextEvent()
         (Line[0] == 'I' && Line[1] == 'N') ) {
 
       if (m_IsFirstEvent == false) {
-        // First set the old event id - this is for backeard compatibility, were we did not have the ID keyword
+        // First set the old event id - this is for backward compatibility, were we did not have the ID keyword
         if (m_EventId != c_NoId) {
           Event->SetEventID(m_EventId);
         }

@@ -105,6 +105,7 @@ class MGUIMimrecMain : public MGUIMain
                    c_ResponseSpdElectronVsCompton, 
                    c_ResponseDualArm, 
                    c_ResponseArmComparison, 
+                   c_ResponseResolutionMeasurePET,
                    c_ResponseBackground, 
                    c_ResponseSpectrum, 
                    c_ResponseInitialEnergyDeposit, 
@@ -137,7 +138,7 @@ class MGUIMimrecMain : public MGUIMain
                    c_ResponseDirectionScatteredGammaRay,
                    c_ResponseTest }; 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MGUIMimrecMain, 0) // main window of the Mimrec GUI
 #endif

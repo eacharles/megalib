@@ -45,7 +45,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#ifdef ___CINT___
+#ifdef ___CLING___
 ClassImp(MResponseStripPairingTMVAEventFile)
 #endif
 
@@ -169,7 +169,8 @@ bool MResponseStripPairingTMVAEventFile::Initialize()
   m_ReGeometry->ActivateNoising(false);
   
   // We ignore the loaded configuration file
-  m_ReReader->SetClusteringAlgorithm(MRawEventAnalyzer::c_ClusteringAlgoNone);
+  m_ReReader->SetEventClusteringAlgorithm(MRawEventAnalyzer::c_EventClusteringAlgoNone);
+  m_ReReader->SetHitClusteringAlgorithm(MRawEventAnalyzer::c_HitClusteringAlgoNone);
   m_ReReader->SetTrackingAlgorithm(MRawEventAnalyzer::c_TrackingAlgoNone);
   m_ReReader->SetCSRAlgorithm(MRawEventAnalyzer::c_CSRAlgoNone);
   m_ReReader->SetDecayAlgorithm(MRawEventAnalyzer::c_DecayAlgoNone);
@@ -185,10 +186,11 @@ bool MResponseStripPairingTMVAEventFile::Initialize()
     for (unsigned int y = 1; y <= m_MaxNHitsY; ++y) {
       MERStripPairingDataSet* DS = new MERStripPairingDataSet();
       DS->Initialize(x, y);
-      MString Name("StripPairing_");
-      Name += x;
-      Name += "_";
-      Name += y;
+      MString Name("StripPairing");
+      //Name += "_";
+      //Name += x;
+      //Name += "_";
+      //Name += y;
       m_Trees[x][y] = DS->CreateTree(Name);
       m_DataSets[x][y] = DS;
     }
@@ -240,7 +242,7 @@ void MResponseStripPairingTMVAEventFile::ShuffleStrips(vector<unsigned int>& Str
 
 bool MResponseStripPairingTMVAEventFile::Analyze()
 {
-  // Create the multiple Compton response
+  // Create the strip pairing response
   
   // Initialize the next matching event, save if necessary
   if (MResponseBuilder::Analyze() == false) return false;
@@ -250,10 +252,8 @@ bool MResponseStripPairingTMVAEventFile::Analyze()
     return true;
   }
   
-  // We require a raw event
-  MRawEventList* REList = m_ReReader->GetRawEventList();
-  
-  MRERawEvent* RE = REList->GetInitialRawEvent();
+  // We require the initial raw event
+  MRERawEvent* RE = m_ReReader->GetInitialRawEvent();
   if (RE == nullptr) {
     return true;
   }
@@ -390,7 +390,7 @@ bool MResponseStripPairingTMVAEventFile::Analyze()
     ShuffleStrips(YStripIDs, YStripEnergies);
     
 
-    // (c) Create list of hit intersection
+    // (c) Create list of intersections with energy deposits
     
     // All intersections
     unsigned int NIntersections = 0;
@@ -399,8 +399,8 @@ bool MResponseStripPairingTMVAEventFile::Analyze()
     
     vector<unsigned int> EvaluationXStripIDs;
     vector<unsigned int> EvaluationYStripIDs;
-    for (int O: AllOrigins) {
-      MVector PositionInDetector = StripVolumeSequences[s1]->GetPositionInVolume(m_SiEvent->GetIAAt(O-1)->GetPosition(), StripVolumeSequences[s1]->GetDetectorVolume());
+    for (unsigned int r = 0; r < RESEs.size(); ++r) {
+      MVector PositionInDetector = StripVolumeSequences[s1]->GetPositionInVolume(RESEs[r]->GetPosition(), StripVolumeSequences[s1]->GetDetectorVolume());
       if (StripVolumeSequences[s1]->GetDetectorVolume()->GetShape()->IsInside(PositionInDetector) == true) {
         MDGridPoint GP = StripVolumeSequences[s1]->GetDetector()->GetGridPoint(PositionInDetector);
         if (GP.GetType() != MDGridPoint::c_Unknown) {
@@ -434,8 +434,8 @@ bool MResponseStripPairingTMVAEventFile::Analyze()
         }
       }
     }
-    
-    // (c) Write to file
+
+    // (d) Write to file
     if (XStripIDs.size() == 0 || XStripIDs.size() > m_MaxNHitsX) continue;
     if (YStripIDs.size() == 0 || YStripIDs.size() > m_MaxNHitsY) continue;
     

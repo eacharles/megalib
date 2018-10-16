@@ -52,6 +52,7 @@ using namespace std;
 #include "MGlobal.h"
 #include "MAssert.h"
 #include "MStreams.h"
+#include "MTimer.h"
 #include "MFileResponse.h"
 #include "MResponseMatrix.h"
 #include "MResponseMatrixON.h"
@@ -932,7 +933,16 @@ bool MResponseManipulator::Join()
   RootTypes.push_back(".tmva.seq8.bad.root");
   RootTypes.push_back(".tmva.seq9.good.root");
   RootTypes.push_back(".tmva.seq9.bad.root");
-    
+
+  RootTypes.push_back(".seq2.quality.root");
+  RootTypes.push_back(".seq3.quality.root");
+  RootTypes.push_back(".seq4.quality.root");
+  RootTypes.push_back(".seq5.quality.root");
+  RootTypes.push_back(".seq6.quality.root");
+  RootTypes.push_back(".seq7.quality.root");
+  RootTypes.push_back(".seq8.quality.root");
+  RootTypes.push_back(".seq9.quality.root");
+
   JoinROOTFiles(m_Prefix, RootTypes);
 
 

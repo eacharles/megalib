@@ -37,7 +37,7 @@ class MResponseMatrixAxis
   // public interface:
  public:
   //! Default constructor
-  MResponseMatrixAxis(const MString& Name);
+  MResponseMatrixAxis(const MString& Name = "");
   //! Default destuctor 
   virtual ~MResponseMatrixAxis();
 
@@ -56,7 +56,7 @@ class MResponseMatrixAxis
   virtual MResponseMatrixAxis* Clone() const;
   
   //! Set the bin edges
-  void SetBinEdges(vector<double> BinEdges) { m_BinEdges = BinEdges; }
+  void SetBinEdges(vector<double> BinEdges);
   //! Set the axis in linear mode
   void SetLinear(unsigned long NBins, double Min, double Max, double UnderFlowMin = g_DoubleNotDefined, double OverFlowMax = g_DoubleNotDefined);
   //! Set the axis in logarithmic mode
@@ -69,7 +69,7 @@ class MResponseMatrixAxis
   bool IsLogarithmic() const { return m_IsLogarithmic; }
   
   //! Return the number of axis bins
-  virtual unsigned long GetNumberOfBins() const { if (m_BinEdges.size() <= 1) { return 0; } else { return m_BinEdges.size() - 1; } }
+  virtual unsigned long GetNumberOfBins() const { return m_NumberOfBins; }
   //! Return the axis bin given a axis value
   //! Can throw: MExceptionArbitrary, MExceptionValueOutOfBounds, MExceptionIndexOutOfBounds
   //! To avoid any exceptions, call InRange() first!
@@ -83,10 +83,10 @@ class MResponseMatrixAxis
   virtual bool InRange(double X1, double X2 = g_DoubleNotDefined) const;
   
   //! True if the axis has 1D bin edges
-  virtual bool Has1DBinEdges() { return true; }
+  virtual bool Has1DBinEdges() const { return true; }
   //! Get the 1D bin edges
   //! Check with Has1DBinEdges first, because this is not guaranteed
-  virtual vector<double> Get1DBinEdges() { return m_BinEdges; }
+  virtual vector<double> Get1DBinEdges() const { return m_BinEdges; }
   
   //! Return the axis bin edges for drawing --- those might be narrower than the real bins
   virtual vector<vector<double>> GetDrawingAxisBinEdges() const;
@@ -119,6 +119,8 @@ class MResponseMatrixAxis
   vector<MString> m_Names;
   //! The bin edges
   vector<double> m_BinEdges;
+  //! The number of bins
+  unsigned long m_NumberOfBins;
   //! Flag if the axis is logarithmic
   bool m_IsLogarithmic;
   
@@ -126,7 +128,7 @@ class MResponseMatrixAxis
 private:
   
 
-#ifdef ___CINT___
+#ifdef ___CLING___
  public:
   ClassDef(MResponseMatrixAxis, 0) // no description
 #endif
