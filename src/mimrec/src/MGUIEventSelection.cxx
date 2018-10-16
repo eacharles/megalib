@@ -577,7 +577,7 @@ void MGUIEventSelection::Create()
                                                     MString("Maximum: "),
                                                     m_Settings->GetQualityFactorPairMin(),
                                                     m_Settings->GetQualityFactorPairMax(),
-                                                    true, 0.0);
+                                                    true, -10.);
   m_QualityFactorPair->SetEntryFieldSize(FieldSize);
   PairFrame->AddFrame(m_QualityFactorPair, MinMaxLayout);
 
