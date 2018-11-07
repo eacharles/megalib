@@ -111,7 +111,7 @@ bool MERTrackKalman2D::SetSpecialParameters(double SigmaHitPos, unsigned int NLa
     }
 
     // Mark: Add you evaluations here:
-    mout<<"MRawEventList* MERTrackKalman2D::EvaluateTracks(MRERawEvent* ER): nyi!"<<endl;
+    mout<<"MRawEventIncarnationList* MERTrackKalman2D::EvaluateTracks(MRERawEvent* ER): nyi!"<<endl;
     //return MERTrack::EvaluateTracks(RE);
 
     // Store your results:
@@ -682,8 +682,8 @@ bool MERTrackKalman2D::SetSpecialParameters(double SigmaHitPos, unsigned int NLa
 
 
       MVector direction(x/mag,y/mag,-z/mag);
-      MVector direction1(-x1/mag1,-y1/mag1,-z1/mag1);
-      MVector direction2(-x2/mag2,-y2/mag2,-z2/mag2);
+      MVector direction1(x1/mag1,y1/mag1,-z1/mag1);
+      MVector direction2(x2/mag2,y2/mag2,-z2/mag2);
 
       Electron->SetFixedDirection(direction1);
       Positron->SetFixedDirection(direction2);

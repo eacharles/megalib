@@ -98,7 +98,7 @@ MERTrackKalman3D::~MERTrackKalman3D()
   }
 
   // Mark: Add you evaluations here:
-  mout<<"MRawEventList* MERTrackKalman3D::EvaluateTracks(MRERawEvent* ER): nyi!"<<endl;
+  mout<<"MRawEventIncarnations* MERTrackKalman3D::EvaluateTracks(MRERawEvent* ER): nyi!"<<endl;
   //return MERTrack::EvaluateTracks(RE);
   //this->TrackPairs(RE);
 
@@ -153,7 +153,7 @@ MString MERTrackKalman3D::ToString(bool CoreOnly) const
 
 
 ////////////////////////////////////////////////////////////////////////////////
-MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
+MRawEventIncarnations* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 {
   // Check if this event could be a pair:
   //
@@ -167,7 +167,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 
   mdebug<<"Searching for a pair vertex"<<endl;
   MRESE* Vertex = 0;
-  MRawEventList *List = 0;
+  MRawEventIncarnations *List = 0;
   bool OnlyHitInLayer = false;
   //unsigned int MaximumLayerJump = 2;
   //MRESE* RESE = 0;
@@ -268,7 +268,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
     }
 
     if (Vertex != 0) {
-      if (List == 0) List = new MRawEventList();
+      if (List == 0) List = new MRawEventIncarnations();
       RE->SetVertex(Vertex);
       RE->SetVertexDirection(-1);
       MRERawEvent *New = RE->Duplicate();
@@ -313,7 +313,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 
       tie(Track1, E1, ChiT1, Track2, E2, ChiT2, Chosen1, Chosen2) = SearchTracks(RE);
       RE->SetVertex(0);
-      
+
       if ((ChiT1==0. && ChiT2==0.) || !(Chosen1.GetNRESEs()>2 && Chosen2.GetNRESEs()>2)) continue;
       Chi2.push_back(ChiT1+ChiT2);
       ID.push_back((*Iterator1)->GetID());
@@ -330,7 +330,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
     }
 
     if (Vertex != 0 ) {
-      if (List == 0) List = new MRawEventList();
+      if (List == 0) List = new MRawEventIncarnations();
       VertexDirection = -1;
       RE->SetVertex(Vertex);
       RE->SetVertexDirection(VertexDirection);
@@ -347,7 +347,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 }
 
 
-/*MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
+/*MRawEventIncarnations* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 {
 // Check if this event could be a pair:
 //
@@ -361,7 +361,7 @@ MRawEventList* MERTrackKalman3D::CheckForPair(MRERawEvent* RE)
 
 mdebug<<"Searching for a pair vertex"<<endl;
 MRESE* Vertex = 0;
-MRawEventList *List = 0;
+MRawEventIncarnations *List = 0;
 bool OnlyHitInLayer = false;
 //unsigned int MaximumLayerJump = 2;
 //MRESE* RESE = 0;
@@ -462,7 +462,7 @@ Vertex = (*Iterator1);
 }
 
 if (Vertex != 0) {
-if (List == 0) List = new MRawEventList();
+if (List == 0) List = new MRawEventIncarnations();
 break; // Only take first right now
 }
 }
@@ -515,7 +515,7 @@ Vertex=RE->GetRESE(ID[i]);
 }
 
 if (Vertex != 0 ) {
-if (List == 0) List = new MRawEventList();
+if (List == 0) List = new MRawEventIncarnations();
 VertexDirection = -1;
 RE->SetVertex(PrelVertex);
 RE->SetVertexDirection(VertexDirection);
@@ -1141,8 +1141,8 @@ void MERTrackKalman3D::TrackPairs(MRERawEvent* RE)
   Float_t mag2=sqrt(x2*x2+y2*y2+z2*z2);
 
   MVector direction(x/mag,y/mag,-z/mag);
-  MVector direction1(-x1/mag1,-y1/mag1,-z1/mag1);
-  MVector direction2(-x2/mag2,-y2/mag2,-z2/mag2);
+  MVector direction1(x1/mag1,y1/mag1,-z1/mag1);
+  MVector direction2(x2/mag2,y2/mag2,-z2/mag2);
 
   Electron->SetFixedDirection(direction1);
   Positron->SetFixedDirection(direction2);

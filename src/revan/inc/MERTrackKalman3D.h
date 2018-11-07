@@ -51,7 +51,7 @@ class MERTrackKalman3D : public MERTrack
   tuple<vector < TMatrix >, Float_t, Float_t, vector < TMatrix >, Float_t, Float_t, MRESEList, MRESEList> SearchTracks(MRERawEvent* RE);
   Float_t MultipleScattering(vector < TMatrix > trk);
   void TrackPairs(MRERawEvent* RE);
-  MRawEventList* CheckForPair(MRERawEvent* RE);
+  MRawEventIncarnations* CheckForPair(MRERawEvent* RE);
 
   //These functions are not used, they are kept for record-keeping
   Float_t EnergyEst3D(vector < TMatrix > trk);
