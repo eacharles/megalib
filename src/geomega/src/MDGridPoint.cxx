@@ -62,7 +62,7 @@ const unsigned int MDGridPoint::c_MaxType = MDGridPoint::c_GuardRing;
 
 MDGridPoint::MDGridPoint() :
   m_xGrid(0), m_yGrid(0), m_zGrid(0), m_Type(c_Unknown), 
-  m_Position(0.0, 0.0, 0.0), m_Energy(0), m_Time(0), m_Hits(1), m_Weight(1.0)
+  m_Position(0.0, 0.0, 0.0), m_Energy(0), m_Time(0), m_Hits(1), m_Weight(1.0), m_IsAboveTriggerThreshold(false), m_IsReadOut(false)
 {
   // Construct an instance of MDGridPoint
   // Type must be c_Unknown!
@@ -82,7 +82,7 @@ MDGridPoint::MDGridPoint(const unsigned int xGrid,
                          const unsigned int Hits,
                          const double Weight) :
   m_xGrid(xGrid), m_yGrid(yGrid), m_zGrid(zGrid), m_Type(Type), 
-  m_Position(Position), m_Energy(Energy), m_Time(Time), m_Hits(Hits), m_Weight(Weight)
+  m_Position(Position), m_Energy(Energy), m_Time(Time), m_Hits(Hits), m_Weight(Weight), m_IsAboveTriggerThreshold(false), m_IsReadOut(false)
 {
   // Construct an instance of MDGridPoint
 }
@@ -116,6 +116,9 @@ MDGridPoint::MDGridPoint(const MDGridPoint& GridPoint)
   }
 
   //m_Origins = GridPoint.m_Origins;
+  
+  m_IsAboveTriggerThreshold = GridPoint.m_IsAboveTriggerThreshold;
+  m_IsReadOut = GridPoint.m_IsReadOut;
 }
 
 
@@ -156,7 +159,10 @@ const MDGridPoint& MDGridPoint::operator=(const MDGridPoint& GridPoint)
   }
 
   //m_Origins = GridPoint.m_Origins;
-
+  
+  m_IsAboveTriggerThreshold = GridPoint.m_IsAboveTriggerThreshold;
+  m_IsReadOut = GridPoint.m_IsReadOut;
+  
   return *this;
 }
 
@@ -261,6 +267,15 @@ const MDGridPoint& MDGridPoint::operator+=(const MDGridPoint& GridPoint)
     } else {
       merr<<"Unknown grid point type: "<<m_Type<<endl;
     }
+    
+    // If the new grid point is read out or above the trigger threshold then the old one is too
+    if (GridPoint.m_IsAboveTriggerThreshold == true) {
+      m_IsAboveTriggerThreshold = true;
+    }
+    if (GridPoint.m_IsReadOut == true) {
+      m_IsReadOut = true;
+    }
+    
   }
 
   return *this;
@@ -306,7 +321,9 @@ ostream& operator<<(ostream& os, const MDGridPoint& GridPoint)
     <<GridPoint.m_Energy<<" keV and "
     <<GridPoint.m_Hits<<" (original) hits after "
     <<GridPoint.m_Time<<" s with the weight "
-    <<GridPoint.m_Weight<<" (";
+    <<GridPoint.m_Weight<<" "
+    <<(GridPoint.m_IsAboveTriggerThreshold ? "above" : "below")<<" trigger threshold and "
+    <<(GridPoint.m_IsReadOut ? "IS" : "IS NOT")<<" read out (";
   if (GridPoint.m_Type == MDGridPoint::c_Voxel) {
     os<<"Voxel)"<<endl;
   } else if (GridPoint.m_Type == MDGridPoint::c_VoxelDrift) {

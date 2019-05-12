@@ -171,9 +171,9 @@ void MDAngerCamera::Noise(MVector& Pos, double& Energy, double& Time, MDVolume* 
   ApplyOverflow(Energy);
   
   // Noise threshold:
-  if (ApplyNoiseThreshold(Energy) == true) {
-    return;
-  }
+  //if (ApplyNoiseThreshold(Energy) == true) {
+  //  return;
+  //}
 
   // Noise the position:
   MDShape* Shape = Volume->GetShape();
@@ -218,10 +218,10 @@ void MDAngerCamera::Noise(MVector& Pos, double& Energy, double& Time, MDVolume* 
 ////////////////////////////////////////////////////////////////////////////////
 
 
-vector<MDGridPoint> MDAngerCamera::Discretize(const MVector& PosInDetectorVolume, 
-                                              const double& Energy, 
-                                              const double& Time, 
-                                              MDVolume* DetectorVolume) const
+vector<MDGridPoint> MDAngerCamera::Grid(const MVector& PosInDetectorVolume, 
+                                        const double& Energy, 
+                                        const double& Time, 
+                                        const MDVolume* DetectorVolume) const
 {
   // Discretize Pos to a voxel of this detector
 
@@ -234,6 +234,7 @@ vector<MDGridPoint> MDAngerCamera::Discretize(const MVector& PosInDetectorVolume
   } else { 
     Points.push_back(MDGridPoint(0, 0, 0, MDGridPoint::c_XYZAnger, PosInDetectorVolume, Energy, Time));
   }
+  
   return Points;
 }
 
@@ -261,7 +262,7 @@ MVector MDAngerCamera::GetPositionInDetectorVolume(const unsigned int xGrid,
                                                    const unsigned int zGrid,
                                                    const MVector PositionInGrid,
                                                    const unsigned int Type,
-                                                   MDVolume* Volume)
+                                                   const MDVolume* Volume) const
 {
   // Return the position in the detector volume
 
