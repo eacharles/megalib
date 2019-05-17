@@ -2415,6 +2415,7 @@ bool SensitivityOptimizer::Analyze()
   for (unsigned int x = 0; x < x_max; ++x) {         
     for (unsigned int y = 0; y < y_max; ++y) {         
       MFileEventsTra Source;
+      Source.SetFastFileParsing(true);
       if (m_ModeSourceExtension == s_ModePointSource) {
         // We have for each angle one point source
         SourceIndex = FindSourceIndex(x, y);
@@ -2610,6 +2611,7 @@ bool SensitivityOptimizer::Analyze()
   // Sensitivity:
   for (unsigned int bf = 0; bf < m_BackgroundFiles.size(); ++bf) {
     MFileEventsTra Source;
+    Source.SetFastFileParsing(true);
     if (Source.Open(m_BackgroundFiles[bf]) == false) {
       mlog<<"Unable to open file "<<m_BackgroundFiles[bf]<<endl;
       return false;
