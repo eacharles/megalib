@@ -165,6 +165,14 @@ bool MDStrip3D::CopyDataToNamedDetectors()
     if (D->m_EnergyPerElectron == g_DoubleNotDefined && m_EnergyPerElectron != g_DoubleNotDefined) {
       D->m_EnergyPerElectron = m_EnergyPerElectron;
     }
+    
+    if (D->m_DriftConstant == g_DoubleNotDefined && m_DriftConstant != g_DoubleNotDefined) {
+      D->m_DriftConstant = m_DriftConstant;
+    }
+      
+    if (D->m_EnergyPerElectron == g_DoubleNotDefined && m_EnergyPerElectron != g_DoubleNotDefined) {
+      D->m_EnergyPerElectron = m_EnergyPerElectron;
+    }
   }
 
   return true;
