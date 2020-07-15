@@ -44,7 +44,7 @@ class MSimHT
   MSimHT(MDGeometryQuest* Geo = 0);
   //! Standard constructor, which contains all neccessary infos
   MSimHT(const int Detector, const MVector& Position, const double Energy, 
-         const double Time, const vector<int>& Origins, MDGeometryQuest* Geo);
+         const double Time, const vector<unsigned int>& Origins, MDGeometryQuest* Geo);
   //! Copy constructor
   MSimHT(const MSimHT& HT);
   //! Default destructor
@@ -78,19 +78,19 @@ class MSimHT
   void SetTime(const double Time) { m_Time = Time; }
 
   //! Test if i is one of the origins of this hit
-  bool IsOrigin(const int i) const;
+  bool IsOrigin(const unsigned int i) const;
   //! Return the i-th origin 
-  int GetOriginAt(const unsigned int i) const;
+  unsigned int GetOriginAt(const unsigned int i) const;
   //! Return the number of origins
   unsigned int GetNOrigins() const;
   //! Add an origin - ignored if it already exists
-  void AddOrigin(const int i);
+  void AddOrigin(const unsigned int i);
   //! Set all origins
-  void SetOrigins(const set<int>& Origins);
-  //! Return the origin with the smallest id
-  int GetSmallestOrigin(const int Except = -1) const;
+  void SetOrigins(const vector<unsigned int>& Origins);
+  //! Return the origin with the smallest ID, ignore any IDs given in Except unless Except is zero, return 0 if nor smallest origin is found 
+  unsigned int GetSmallestOrigin(const unsigned int Except = 0) const;
   //! Return all origins
-  vector<int> GetOrigins() const;
+  vector<unsigned int> GetOrigins() const;
 
   //! Set the cluster this hit is in
   void SetCluster(MSimCluster* Cluster);
@@ -153,7 +153,7 @@ class MSimHT
   //! Time of the deposit
   double m_Time;           
   //! Particles from these vertices (= origins) contributed to this hit
-  vector<int> m_Origins; 
+  vector<unsigned int> m_Origins; 
 
   //! Position, where the hit took place, before noising
   MVector m_OriginalPosition;  

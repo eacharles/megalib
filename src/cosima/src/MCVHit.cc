@@ -98,7 +98,7 @@ MSimHT* MCVHit::GetCalibrated()
   HT->SetDetectorType(m_DetectorType);
   HT->SetEnergy(m_Energy/keV);
   HT->SetTime(m_Time/s);
-  HT->SetOrigins(m_Origins);
+  HT->SetOrigins(vector<unsigned int>(m_Origins.begin(), m_Origins.end()));
   return HT;
 }
 
