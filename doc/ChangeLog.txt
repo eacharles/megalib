@@ -18,6 +18,10 @@ Version 2.99/3.00
 + The performance of activation simulations is still not the best...
   
   
+*** Critcal bug fixes
++ Powerlaws with an index of alpha=1.0 were not simulated correctly in cosima
++ When simulating guard rings for voxel detectors, the Y offset was used as Z offset
+
 *** Significant new features & improvements:
 
 General:
@@ -95,7 +99,7 @@ Examples:
 + The EventList example demonstrates the use of event list during simulation
   basically allowing any arbitrary beam/spectrum/polarization input
 
-  
+
 ... plus many, many smaller things I already forgot about :)
 
 
