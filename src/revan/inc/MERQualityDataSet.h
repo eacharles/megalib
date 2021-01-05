@@ -42,12 +42,12 @@ class MERQualityDataSet
    //! Default constructor
    MERQualityDataSet();
    //! Standard constructor - initialize for the given sequence length
-   MERQualityDataSet(unsigned int MaxSequenceLength, bool UsePathToFirstIA = false);
+   MERQualityDataSet(unsigned int MaxSequenceLength, unsigned int NumberOfPathSamplesToFirstIA = 0);
    //! Default destuctor 
   virtual ~MERQualityDataSet();
 
   //! Create data set for the given sequence length, 2..N
-  void Initialize(unsigned int MaxSequenceLength, bool UsePathToFirstIA = false);
+  void Initialize(unsigned int MaxSequenceLength, unsigned int NumberOfPathSamplesToFirstIA = 0);
   
   //! Create trees
   //! Tree must be deleted afterwards
@@ -64,6 +64,8 @@ class MERQualityDataSet
   void FillEvaluationIsCompletelyAbsorbed(bool IsCompletelyAbsorbed);
   //! Fill the evaluation section, whether the event is competely absorbed
   void FillEvaluationIsReconstructable(bool IsReconstructable);
+  //! Fill the evaluation section, whether the event originates from a decay
+  void FillEvaluationIsDecay(bool IsDecay);
   //! Fill the evaluation section, about the zenith angle of the incoming gamma ray
   void FillEvaluationZenithAngle(Float_t ZenithAngle);
   
@@ -99,6 +101,8 @@ class MERQualityDataSet
   Int_t m_EvaluationIsCompletelyAbsorbed;
   //! Is the event reconstructabe
   Int_t m_EvaluationIsReconstructable;
+  //! Is the event originating from an decay
+  Int_t m_EvaluationIsDecay;
   //! The Zenith angle
   Float_t m_EvaluationZenithAngle;
   

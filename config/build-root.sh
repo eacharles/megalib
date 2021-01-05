@@ -5,8 +5,16 @@
 #
 # Please see the MEGAlib software license and documentation for more informations.
 
-# Install path realtive to the build path --- simply one up in this script
-CONFIGUREOPTIONS="-DCMAKE_INSTALL_PREFIX=.."
+CONFIGUREOPTIONS=" "
+# Install path relative to the build path --- simply one up in this script
+CONFIGUREOPTIONS+=" -DCMAKE_INSTALL_PREFIX=.."
+# Make sure we ignore some default paths of macport.
+type port >/dev/null 2>&1
+if [[ $? -eq 0 ]]; then
+  PORTPATH=$(which port)
+  PORTPATH=${PORTPATH%/bin/port}
+  CONFIGUREOPTIONS+=" -DCMAKE_IGNORE_PATH=${PORTPATH};${PORTPATH}/bin;${PORTPATH}/include;${PORTPATH}/include/libxml2;${PORTPATH}/include/unicode"
+fi
 # To compile ROOT 6.06 with gcc 5.x --- no longer  needed for ROOT 6.08 and higher
 #CONFIGUREOPTIONS+=" -DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=0"
 # We want a minimal system and enable what we really need:
@@ -38,19 +46,30 @@ type python3 >/dev/null 2>&1
 if [[ $? -eq 0 ]]; then
   PPATH=$(which python3)
   if [[ -f ${PPATH} ]]; then
-    CONFIGUREOPTIONS+=" -DPYTHON_EXECUTABLE=${PPATH} -Dpython3=ON"
+    if [[ ${PPATH} == *conda* ]]; then
+      echo "ERROR: You cannot use a python version installed via (ana)conda with ROOT."
+      exit 1
+    else
+      CONFIGUREOPTIONS+=" -DPYTHON_EXECUTABLE:FILEPATH=${PPATH} -Dpython3=ON"
+    fi
   fi
 fi
 
-# Enable cuda
-CONFIGUREOPTIONS+=" -Dcuda=ON" 
+# Enable cuda if available
+type nvcc >/dev/null 2>&1
+if [[ $? -eq 0 ]]; then
+  CONFIGUREOPTIONS+=" -Dcuda=ON"
+fi
 
-# In case ROOT complains about you python version
+# In case ROOT complains about your python version
 # CONFIGUREOPTIONS+=" -Dpython=OFF"
 # CONFIGUREOPTIONS+=" -Dpython3=OFF"
 
 # Switching off things we do not need right now but which are on by default
 CONFIGUREOPTIONS+=" -Dalien=OFF -Dbonjour=OFF -Dcastor=OFF -Ddavix=OFF -Dfortran=OFF -Dfitsio=OFF -Dchirp=OFF -Ddcache=OFF -Dgfal=OFF -Dglite=off -Dhdfs=OFF -Dkerb5=OFF -Dldap=OFF -Dmonalisa=OFF -Dodbc=OFF -Doracle=OFF -Dpch=OFF -Dpgsql=OFF -Dpythia6=OFF -Dpythia8=OFF -Drfio=OFF -Dsapdb=OFF -Dshadowpw=OFF -Dsqlite=OFF -Dsrp=OFF -Dssl=OFF -Dxrootd=OFF"
+
+# Explictly add gcc -- cmake seems to sometimes digg up other compilers on the system, not the default one...
+# CONFIGUREOPTIONS+=" -DCMAKE_C_COMPILER=$(which gcc) -DCMAKE_CXX_COMPILER=$(which g++)"
 
 # The compiler
 COMPILEROPTIONS=`gcc --version | head -n 1`
@@ -75,30 +94,30 @@ type curl >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo "ERROR: curl must be installed"
     exit 1
-fi 
+fi
 type openssl >/dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo "ERROR: openssl must be installed"
     exit 1
-fi 
+fi
 
 
 confhelp() {
   echo ""
   echo "Building ROOT"
-  echo " " 
+  echo " "
   echo "Usage: ./build-root.sh [options]";
   echo " "
   echo " "
   echo "Options:"
   echo "--tarball=[file name of ROOT tar ball]"
-  echo "    Use this tarball instead of downloading it from the ROOT website" 
+  echo "    Use this tarball instead of downloading it from the ROOT website"
   echo " "
   echo "--rootversion=[e.g. 5.34, 6.10]"
   echo "    Use the given ROOT version instead of the one required by MEGAlib."
   echo " "
   echo "--sourcescript=[file name of new environment script]"
-  echo "    File in which the MEGAlib environment is/will be stored. This is used by the MEGAlib setup script" 
+  echo "    File in which the MEGAlib environment is/will be stored. This is used by the MEGAlib setup script"
   echo " "
   echo "--debug=[off/no, on/yes - default: off]"
   echo "    Compile with degugging options."
@@ -193,9 +212,9 @@ echo ""
 if [ "${TARBALL}" != "" ]; then
   if [[ ! -f "${TARBALL}" ]]; then
     echo "ERROR: The chosen tarball cannot be found: ${TARBALL}"
-    exit 1     
-  else   
-    echo " * Using this tarball: ${TARBALL}"    
+    exit 1
+  else
+    echo " * Using this tarball: ${TARBALL}"
   fi
 fi
 
@@ -203,9 +222,9 @@ fi
 if [ "${ENVFILE}" != "" ]; then
   if [[ ! -f "${ENVFILE}" ]]; then
     echo "ERROR: The chosen environment file cannot be found: ${ENVFILE}"
-    exit 1     
-  else   
-    echo " * Using this environment file: ${ENVFILE}"    
+    exit 1
+  else
+    echo " * Using this environment file: ${ENVFILE}"
   fi
 fi
 
@@ -213,11 +232,11 @@ fi
 if [ ! -z "${MAXTHREADS##[0-9]*}" ] 2>/dev/null; then
   echo "ERROR: The maximum number of threads must be number and not ${MAXTHREADS}!"
   exit 1
-fi  
+fi
 if [ "${MAXTHREADS}" -le "0" ]; then
   echo "ERROR: The maximum number of threads must be at least 1 and not ${MAXTHREADS}!"
   exit 1
-else 
+else
   echo " * Using this maximum number of threads: ${MAXTHREADS}"
 fi
 
@@ -274,9 +293,15 @@ KEEPENVASIS=`echo ${KEEPENVASIS} | tr '[:upper:]' '[:lower:]'`
 if ( [[ ${KEEPENVASIS} == of* ]] || [[ ${KEEPENVASIS} == n* ]] ); then
   KEEPENVASIS="off"
   echo " * Clearing the environment paths LD_LIBRARY_PATH, CPATH"
-  # We cannot clean PATH, otherwise no programs can be found anymore 
+  # We cannot clean PATH, otherwise no programs can be found anymore
   export LD_LIBRARY_PATH=""
+  export SHLIB_PATH=""
   export CPATH=""
+  export CMAKE_PREFIX_PATH=""
+  export DYLD_LIBRARY_PATH=""
+  export JUPYTER_PATH=""
+  export LIBPATH=""
+  export MANPATH=""
 elif ( [[ ${KEEPENVASIS} == on ]] || [[ ${KEEPENVASIS} == y* ]] ); then
   KEEPENVASIS="on"
   echo " * Keeping the existing environment paths as is."
@@ -296,7 +321,7 @@ ROOTTOPDIR=""
 if [ "${TARBALL}" != "" ]; then
   # Use given ROOT tarball
   echo "The given ROOT tarball is ${TARBALL}"
-  
+
   # Determine the name of the top level directory in the tar ball
   ROOTTOPDIR=`tar tzf ${TARBALL} | sed -e 's@/.*@@' | uniq`
   RESULT=$?
@@ -304,7 +329,7 @@ if [ "${TARBALL}" != "" ]; then
     echo "ERROR: Cannot find top level directory in the tar ball!"
     exit 1
   fi
-  
+
   # Check if it has the correct version:
   VER=`tar xfzO ${TARBALL} ${ROOTTOPDIR}/build/version_number | sed 's|/|.|g'`
   RESULT=$?
@@ -317,13 +342,13 @@ if [ "${TARBALL}" != "" ]; then
     exit 1
   fi
   echo "Version of ROOT is: ${VER}"
-  
+
   if [[ ${WANTEDVERSION} != "" ]]; then
     if [[ ${VER} != ${WANTEDVERSION}.* ]]; then
       echo "ERROR: The ROOT tarball has not the same version ${VER} you wanted on the command line ${WANTEDVERSION}!"
       exit 1
     fi
-  else 
+  else
     bash ${MEGALIB}/config/check-rootversion.sh --good-version=${VER}
     if [ "$?" != "0" ]; then
       echo "ERROR: The ROOT tarball you supplied does not contain an acceptable ROOT version!"
@@ -332,9 +357,9 @@ if [ "${TARBALL}" != "" ]; then
   fi
 else
   # Download it
-  
+
   # Get desired version:
-  if [[ ${WANTEDVERSION} == "" ]]; then 
+  if [[ ${WANTEDVERSION} == "" ]]; then
     WANTEDVERSION=`bash ${MEGALIB}/config/check-rootversion.sh --get-max`
     if [ "$?" != "0" ]; then
       echo "ERROR: Unable to determine required ROOT version!"
@@ -342,24 +367,29 @@ else
     fi
   fi
   echo "Looking for ROOT version ${WANTEDVERSION} with latest patch on the ROOT website --- sometimes this takes a few minutes..."
-  
+
   # Now check root repository for the selected version:
   TARBALL=""
+  MAX_TRIALS=3
   for s in `seq -w 00 2 98`; do
     TESTTARBALL="root_v${WANTEDVERSION}.${s}.source.tar.gz"
     echo "Trying to find ${TESTTARBALL}..."
     EXISTS=`curl -s --head https://root.cern.ch/download/${TESTTARBALL} | grep gzip`
-    if [[ ${EXISTS} == "" && ${s} != "00" ]]; then # sometimes version 00 does not exist...
-      break
+    if [[ ${EXISTS} == "" ]]; then # sometimes version 00 does not exist...
+      MAX_TRIALS=$(( MAX_TRIALS - 1 ))
+      if [[ ${MAX_TRIALS} -eq 0 ]]; then
+        break
+      fi
+    else 
+      TARBALL=${TESTTARBALL}
     fi
-    TARBALL=${TESTTARBALL}
   done
   if [[ -z ${TARBALL} ]]; then
     echo "ERROR: Unable to find a suitable ROOT tar ball"
     exit 1
   fi
   echo "Using ROOT tar ball ${TARBALL}"
-  
+
   # Check if it already exists locally
   REQUIREDOWNLOAD="true"
   if [ -f ${TARBALL} ]; then
@@ -376,9 +406,13 @@ else
       echo "File is already present and has same size, thus no download required!"
     fi
   fi
-  
+
   if [ "${REQUIREDOWNLOAD}" == "true" ]; then
-    echo "Downloading ${TARBALL}"
+    echo "Starting the download."
+    echo "If the download fails, you can continue it via the following command and then call this script again - it will use the downloaded file."
+    echo " "
+    echo "curl -O -C - https://root.cern.ch/download/${TARBALL}"
+    echo " "
     curl -O https://root.cern.ch/download/${TARBALL}
     if [ "$?" != "0" ]; then
       echo "ERROR: Unable to download the tarball from the ROOT website!"
@@ -393,7 +427,7 @@ else
     echo "ERROR: Cannot find top level directory in the tar ball!"
     exit 1
   fi
-  
+
   VER=`tar xfzO ${TARBALL} ${ROOTTOPDIR}/build/version_number | sed 's|/|.|g'`
   if [ "$?" != "0" ]; then
     echo "ERROR: Something went wrong unpacking the ROOT tarball!"
@@ -409,24 +443,24 @@ fi
 
 ROOTCORE=root_v${VER}
 ROOTDIR=root_v${VER}${DEBUGSTRING}
-ROOTSOURCEDIR=root_v${VER}-source   # Attention: the cleanup checks this name pattern before removing it 
-ROOTBUILDDIR=root_v${VER}-build     # Attention: the cleanup checks this name pattern before removing it 
+ROOTSOURCEDIR=root_v${VER}-source   # Attention: the cleanup checks this name pattern before removing it
+ROOTBUILDDIR=root_v${VER}-build     # Attention: the cleanup checks this name pattern before removing it
 
 echo "Checking for old installation..."
 if [ -d ${ROOTDIR} ]; then
   cd ${ROOTDIR}
   if [ -f COMPILE_SUCCESSFUL ]; then
-  
+
     SAMEOPTIONS=`cat COMPILE_SUCCESSFUL | grep -F -x -- "${CONFIGUREOPTIONS}"`
     if [ "${SAMEOPTIONS}" == "" ]; then
       echo "The old installation used different compilation options..."
     fi
-    
+
     SAMECOMPILER=`cat COMPILE_SUCCESSFUL | grep -F -x -- "${COMPILEROPTIONS}"`
     if [ "${SAMECOMPILER}" == "" ]; then
       echo "The old installation used a different compiler..."
     fi
-    
+
     SAMEPATCH=""
     PATCHPRESENT="no"
     if [ -f "${MEGALIB}/resource/patches/${ROOTCORE}.patch" ]; then
@@ -437,26 +471,26 @@ if [ -d ${ROOTDIR} ]; then
     if [[ ${PATCHSTATUS} == Patch\ applied* ]]; then
       PATCHMD5=`echo ${PATCHSTATUS} | awk -F" " '{ print $3 }'`
     fi
-    
+
     if [[ ${PATCH} == on ]]; then
       if [[ ${PATCHPRESENT} == yes ]] && [[ ${PATCHSTATUS} == Patch\ applied* ]] && [[ ${PATCHPRESENTMD5} == ${PATCHMD5} ]]; then
-        SAMEPATCH="YES"; 
+        SAMEPATCH="YES";
       elif [[ ${PATCHPRESENT} == no ]] && [[ ${PATCHSTATUS} == Patch\ not\ applied* ]]; then
-        SAMEPATCH="YES"; 
+        SAMEPATCH="YES";
       else
-        echo "The old installation didn't use the same patch..."  
+        echo "The old installation didn't use the same patch..."
         SAMEPATCH=""
       fi
     elif [[ ${PATCH} == off ]]; then
       if [[ ${PATCHSTATUS} == Patch\ not\ applied* ]] || [[ -z ${PATCHSTATUS}  ]]; then    # last one means empty
-        SAMEPATCH="YES"; 
+        SAMEPATCH="YES";
       else
-        echo "The old installation used a patch, but now we don't want any..."  
+        echo "The old installation used a patch, but now we don't want any..."
         SAMEPATCH=""
       fi
     fi
-    
-    
+
+
     if ( [ "${SAMEOPTIONS}" != "" ] && [ "${SAMECOMPILER}" != "" ] && [ "${SAMEPATCH}" != "" ] ); then
       echo "Your already have a usable ROOT version installed!"
       if [ "${ENVFILE}" != "" ]; then
@@ -466,9 +500,9 @@ if [ -d ${ROOTDIR} ]; then
       exit 0
     fi
   fi
-    
+
   echo "Old installation is either incompatible or incomplete. Removing ${ROOTDIR}..."
-  
+
   cd ..
   if echo "${ROOTDIR}" | grep -E '[ "]' >/dev/null; then
     echo "ERROR: Feeding my paranoia of having a \"rm -r\" in a script:"
@@ -483,7 +517,7 @@ fi
 echo "Unpacking..."
 mkdir ${ROOTDIR}
 cd ${ROOTDIR}
-tar xvfz ../${TARBALL} > /dev/null
+tar xfz ../${TARBALL} > /dev/null
 if [ "$?" != "0" ]; then
   echo "ERROR: Something went wrong unpacking the ROOT tarball!"
   exit 1
@@ -509,6 +543,10 @@ fi
 echo "Configuring..."
 cd ${ROOTBUILDDIR}
 export ROOTSYS=${ROOTDIR}
+#if [[ ${OSTYPE} == darwin* ]]; then
+#  export CPLUS_INCLUDE_PATH=`xcrun --show-sdk-path`/usr/include
+#  export LIBRARY_PATH=$LIBRARY_PATH:`xcrun --show-sdk-path`/usr/lib
+#fi
 echo "Configure command: cmake ${CONFIGUREOPTIONS} ${DEBUGOPTIONS} ../${ROOTSOURCEDIR}"
 cmake ${CONFIGUREOPTIONS} ${DEBUGOPTIONS} ../${ROOTSOURCEDIR}
 if [ "$?" != "0" ]; then
@@ -521,7 +559,7 @@ fi
 CORES=1;
 if [[ ${OSTYPE} == darwin* ]]; then
   CORES=`sysctl -n hw.logicalcpu_max`
-elif [[ ${OSTYPE} == linux* ]]; then 
+elif [[ ${OSTYPE} == linux* ]]; then
   CORES=`grep processor /proc/cpuinfo | wc -l`
 fi
 if [ "$?" != "0" ]; then
@@ -556,16 +594,16 @@ cd ..
 if [[ ${CLEANUP} == on ]]; then
   echo "Cleaning up ..."
   # Just a sanity check before our remove...
-  if [[ ${ROOTBUILDDIR} == root_v*-build ]]; then 
+  if [[ ${ROOTBUILDDIR} == root_v*-build ]]; then
     rm -rf ${ROOTBUILDDIR}
     if [ "$?" != "0" ]; then
-      echo "ERROR: Unable to remove buuld directory!"
+      echo "ERROR: Unable to remove build directory!"
       exit 1
     fi
   else
     echo "INFO: Not cleaning up the build directory, because it is not named as expected: ${ROOTBUILDDIR}"
   fi
-  if [[ ${ROOTSOURCEDIR} == root_v*-source ]]; then 
+  if [[ ${ROOTSOURCEDIR} == root_v*-source ]]; then
     rm -rf ${ROOTSOURCEDIR}
     if [ "$?" != "0" ]; then
       echo "ERROR: Unable to remove source directory!"

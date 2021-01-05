@@ -30,11 +30,15 @@ PRGSX = \
 	$(BN)/SimpleComptonImaging \
 	$(BN)/ExternalDataAnalysisExample \
 	$(BN)/ShowHistograms \
+	$(BN)/CompareHistograms \
+	$(BN)/DistanceOptimizerForEventClusterizer \
 	$(BN)/Revoxelizer \
 	$(BN)/IsotopeFileSplitter \
 	$(BN)/VariableSourceDetector \
 
-FITS = $(BN)/ConvertMGGPOD
+FITS = \
+	$(BN)/TraFitsConverter \
+	$(BN)/ConvertMGGPOD \
 
 MPI = $(BN)/bundler
 
@@ -42,7 +46,7 @@ MPI = $(BN)/bundler
 
 MLIBS = -L$(LB) -lMimrecGui -lMimrec -lRevanGui -lRevan -lSivanGui -lSivan -lSpectralyzeGui -lSpectralyze -lGeomegaGui -lGeomega -lCommonMisc -lCommonGui  
 
-EVERYTHING = $(PRGSX)
+EVERYTHING = $(PRGSX) $(FITS)
 
 #----------------------------------------------------------------
 # Commands:

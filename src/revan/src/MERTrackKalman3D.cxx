@@ -64,6 +64,24 @@ ClassImp(MERTrackKalman3D)
 ////////////////////////////////////////////////////////////////////////////////
 
 
+Float_t MERTrackKalman3D::accumulate(vector<Float_t>::const_iterator start,
+				   vector<Float_t>::const_iterator stop,
+				   Float_t init_value)
+{
+  // Use a double to store the running sum, since we might be 
+  // adding together a lot of things
+  double sum(init_value);
+  for ( std::vector<float>::const_iterator itr = start;
+	itr != stop; itr++ ) {
+    sum += *itr;
+  }
+  return (Float_t)sum;
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+
 MERTrackKalman3D::MERTrackKalman3D() : MERTrack()
 {
   // Construct an instance of MERTrackKalman3D

@@ -117,7 +117,8 @@ MCSteppingAction::MCSteppingAction(MCParameterFile& RunParameters) :
   m_KnownProcess.push_back("PenConversion"); m_KnownProcessID.push_back(c_ProcessIDPair);
   m_KnownProcess.push_back("LowEnConversion"); m_KnownProcessID.push_back(c_ProcessIDPair);
   m_KnownProcess.push_back("LowEnPolarizConversion"); m_KnownProcessID.push_back(c_ProcessIDPair);
-
+  m_KnownProcess.push_back("muPairProd"); m_KnownProcessID.push_back(c_ProcessIDPair);
+  
   m_KnownProcess.push_back("annihil"); m_KnownProcessID.push_back(c_ProcessIDAnnihilation);
   m_KnownProcess.push_back("PenAnnih"); m_KnownProcessID.push_back(c_ProcessIDAnnihilation);
   
@@ -125,6 +126,7 @@ MCSteppingAction::MCSteppingAction(MCParameterFile& RunParameters) :
   m_KnownProcess.push_back("hBrems"); m_KnownProcessID.push_back(c_ProcessIDBremsstrahlung);
   m_KnownProcess.push_back("PenelopeBrem"); m_KnownProcessID.push_back(c_ProcessIDBremsstrahlung);
   m_KnownProcess.push_back("LowEnBrem"); m_KnownProcessID.push_back(c_ProcessIDBremsstrahlung);
+  m_KnownProcess.push_back("muBrems"); m_KnownProcessID.push_back(c_ProcessIDBremsstrahlung);
   
   m_KnownProcess.push_back("Rayl"); m_KnownProcessID.push_back(c_ProcessIDRayleigh);
   m_KnownProcess.push_back("PenRayleigh"); m_KnownProcessID.push_back(c_ProcessIDRayleigh);
@@ -1136,7 +1138,7 @@ void MCSteppingAction::UserSteppingAction(const G4Step* Step)
     } else {
       if (ProcessID == c_ProcessIDUncovered) {
         merr<<"Uncovered process: "<<ProcessName<<" - please inform the lead developers of this problem."<<endl
-            <<"-> Your simulations are ok - you only might miss an IA line in the sim file."<<show;
+            <<"-> Your simulations are completely OK - you only might miss an IA line in the sim file."<<show;
       }
 
   

@@ -107,7 +107,9 @@ bool MDShapePGON::Set(double Phi, double DPhi, unsigned int NSides,
   m_Z.resize(NSections);
   m_Rmin.resize(NSections);
   m_Rmax.resize(NSections);
-
+  
+  m_IsValidated = false;
+  
   return true;
 }
 
@@ -137,7 +139,9 @@ bool MDShapePGON::AddSection(unsigned int Section, double Z, double Rmin, double
   m_Z[Section] = Z;
   m_Rmin[Section] = Rmin;
   m_Rmax[Section] = Rmax;
-
+  
+  m_IsValidated = false;
+  
   return true;
 }
 
@@ -147,11 +151,16 @@ bool MDShapePGON::AddSection(unsigned int Section, double Z, double Rmin, double
 
 bool MDShapePGON::Validate()
 {
-  delete m_Geo;
-  m_Geo = new TGeoPgon(m_Phi, m_DPhi, m_NSides, m_NSections);
+  
+  if (m_IsValidated == false) {
+    delete m_Geo;
+    m_Geo = new TGeoPgon(m_Phi, m_DPhi, m_NSides, m_NSections);
 
-  for (unsigned int i = 0; i < m_NSections; ++i) {
-    dynamic_cast<TGeoPcon*>(m_Geo)->DefineSection(i, m_Z[i], m_Rmin[i], m_Rmax[i]);
+    for (unsigned int i = 0; i < m_NSections; ++i) {
+      dynamic_cast<TGeoPcon*>(m_Geo)->DefineSection(i, m_Z[i], m_Rmin[i], m_Rmax[i]);
+    }
+  
+    m_IsValidated = true;
   }
   
   return true;
@@ -235,10 +244,12 @@ bool MDShapePGON::Parse(const MTokenizer& Tokenizer, const MDDebugInfo& Info)
     }    
 
   } else {
-    Info.Error("Unhandled descriptor in shape PGON!");
+    Info.Error(MString("Unhandled descriptor in shape PGON: ") + Tokenizer.GetTokenAt(1));
     return false;
   }
- 
+  
+  m_IsValidated = false;
+  
   return true; 
 }
 
@@ -414,6 +425,8 @@ void MDShapePGON::Scale(const double Factor)
     m_Z[i] *= Factor;  
   }
   
+  m_IsValidated = false;
+  
   Validate();
 }
 
@@ -424,7 +437,24 @@ void MDShapePGON::Scale(const double Factor)
 MVector MDShapePGON::GetUniquePosition() const
 {
   // Return a unique position within this detectors volume
-
+  
+  // If the volume is simple, use the center
+  bool Is360 = false;
+  if (fabs(m_DPhi - 360) < 0.000000001) Is360 = true;
+  
+  bool FilledCenter = true;
+  for (unsigned int i = 0; i < m_NSections; ++i) {
+    if (m_Rmin[i] != 0) {
+      FilledCenter = false;
+      break;
+    }
+  }
+  
+  if (Is360 == true && FilledCenter == true) {
+    return MVector(0, 0, (m_Z[m_NSections-1]+m_Z[0])/2.0);
+  }
+  
+  // Otherwise the unique position is offset
   double R = 0.25*(m_Rmax[1]+m_Rmin[1]+m_Rmax[0]+m_Rmin[0]);
   double Angle = (m_Phi+0.5*m_DPhi)*c_Rad; 
 

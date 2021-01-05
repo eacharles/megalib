@@ -3,15 +3,58 @@
 ******************************************************************************
 
 
+
+
+
+
+Version 3.03/3.04
+=================
+
+Cosima:
++ New storage option "ia-only"
+
+Long-term bugs fixed:
++ The incidence direction of the 511-keV emission was wrong
+
+
+
+Version 3.01/3.02
+=================
+
+General:
++ setup: HEASoft can now be compiled as optional package
++ setup: New script configure_macport to setup macport before compiling 
+         ROOT/Geant4/MEGAlib on macOS Catalina
++ dmegalib: New dmegalib-setup, which needs to be run before the distributed
+            analysis can be used
+
+Fretalon:
++ Changes to the API to run Melinator in a python script 
+            
+Mimrec:
++ New option in the event selector to choose the detector of the 2nd interaction
++ New tool to convert the tra file into a COSI Level 3 fits file and back
+
+Examples:
++ AllSky: How to simulate all-sky images
++ Cross-section plotter
+
+Long-term bugs fixed:
++ Sivan: There was a uncommon programatic path using clusters and discretization, 
+         which could have lead to double noising 
+ 
+
+
+
 Version 2.99/3.00
 =================
 
 *** IMPORTANT - PLEASE READ:
 
++ Switch to GPL v3 license
 + Big update to revan and mimrec to allow triple-compton PET reconstruction 
   requiring significant internal changes (v2.99.10)
-  If something is not working email me.
-+ Default ROOT version is now 6.14, default Geant4 version is 10.2
++ Default ROOT version is now 6.18, default Geant4 version is 10.2
  
 
 *** KNOWN ISSUES
@@ -33,6 +76,8 @@ General:
 + Official MEGAlib docker container 
 + Removed old Visual Studio projects since MEGAlib can now be run in a
   container and on Linux on Windows
++ Dropped svn & cvs support in the setup script
++ Added benchmark in resource/examples/Benchmark
 
 Cosima:
 + Support for Geant4 10.2
@@ -46,12 +91,16 @@ Cosima:
 + Replaced "StoreOnlyTriggeredEvents" with "PreTriggerMode" using 3 modes:
   Full, EveryEventWithHits & Everything
 + Updated all examples
++ In the documentation, the break energy of the Band function was 
+  accidentially called peak energy (formula was correct)
+
 
 Sivan:
 + Enabled comments (and their passing through) in the sim file ("CC" tag)
 
 Fretalon:
 + Many smaller enhancements triggered by COSI analysis
++ Detection enhancements in Melinator
 
 Geomega:
 + New option to show the surrounding sphere (ShowSurroundingsphere true)
@@ -98,6 +147,7 @@ Addons:
 Examples:
 + The EventList example demonstrates the use of event list during simulation
   basically allowing any arbitrary beam/spectrum/polarization input
++ GRB sampling based on BATSE catalog
 
 
 ... plus many, many smaller things I already forgot about :)
@@ -108,6 +158,7 @@ Long-term bugs fixed:
 + Cosima: Voxel3D: The Y offset was used as Z offset during simulations
 + Cosima: In DecayMode buildup (the one used for hadron therapy, 
   not astrophysics) the DetectorDecayConstant was ignored
++ Geomega: Sphere: The random position generation wasn't really random
 + Revan: Reported by Alexey: Some events were incorrectly rejected in the classic
   event reconstruction approach
 

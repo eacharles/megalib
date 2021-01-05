@@ -26,12 +26,19 @@
 #include "TTree.h"
 // Forward declarations:
 
+#include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////
 
 
 class MERTrackKalman3D : public MERTrack
 {
+
+  // Utility fucnciton
+  static Float_t accumulate(vector<Float_t>::const_iterator start,
+			    vector<Float_t>::const_iterator stop,
+			    Float_t init_value);
+  
   // public interface:
  public:
   MERTrackKalman3D();

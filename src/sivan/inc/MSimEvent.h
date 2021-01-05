@@ -116,6 +116,10 @@ class MSimEvent : public MRotationInterface
   void RemoveHT(MSimHT* HT);
   //! Remove all but the given hit from the event - the HT's are not deleted!
   void RemoveAllHTsBut(MSimHT* HT);
+  //! Remove all hits from the event - the HT's are not deleted!
+  void RemoveAllHTs();
+  //! Delete all HTs
+  void DeleteAllHTs();
 
   //! Add a directional information
   bool AddDR(const MSimDR& DR);
@@ -165,7 +169,9 @@ class MSimEvent : public MRotationInterface
   /// Flag indicating only INIT simulation info is stored
   static const int c_StoreSimulationInfoInitOnly; 
   /// Flag indicating NO simulation info is stored
-  static const int c_StoreSimulationInfoNone; 
+  static const int c_StoreSimulationInfoNone;
+  /// Flag indicating only IA info is stored
+  static const int c_StoreSimulationInfoIAOnly;
 
   //! Convert the content to string
   MString ToString();

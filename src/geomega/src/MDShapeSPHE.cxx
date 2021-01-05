@@ -136,6 +136,8 @@ bool MDShapeSPHE::Set(double Rmin, double Rmax,
   m_Phimin = Phimin;
   m_Phimax = Phimax;
   
+  m_IsValidated = false;
+  
   return true;
 }
 
@@ -170,6 +172,8 @@ bool MDShapeSPHE::Set(double Rmin, double Rmax)
   m_Phimin = 0;
   m_Phimax = 360;
   
+  m_IsValidated = false;
+  
   return true;
 }
 
@@ -178,10 +182,14 @@ bool MDShapeSPHE::Set(double Rmin, double Rmax)
 
 
 bool MDShapeSPHE::Validate()
-{
-  delete m_Geo;
-  m_Geo = new TGeoSphere(m_Rmin, m_Rmax, m_Thetamin, m_Thetamax, m_Phimin, m_Phimax);
-
+{  
+  if (m_IsValidated == false) {
+    delete m_Geo;
+    m_Geo = new TGeoSphere(m_Rmin, m_Rmax, m_Thetamin, m_Thetamax, m_Phimin, m_Phimax);
+  
+    m_IsValidated = true;
+  }
+  
   return true;
 }
 
@@ -217,10 +225,12 @@ bool MDShapeSPHE::Parse(const MTokenizer& Tokenizer, const MDDebugInfo& Info)
       return false;
     }
   } else {
-    Info.Error("Unhandled descriptor in shape Sphere!");
+    Info.Error(MString("Unhandled descriptor in shape Sphere: ") + Tokenizer.GetTokenAt(1));
     return false;
   }
- 
+  
+  m_IsValidated = false;
+  
   return true; 
 }
 
@@ -341,7 +351,9 @@ void MDShapeSPHE::Scale(const double Factor)
 
   m_Rmin *= Factor;
   m_Rmax *= Factor;
-
+  
+  m_IsValidated = false;
+  
   Validate();
 }
 
@@ -369,10 +381,10 @@ MVector MDShapeSPHE::GetRandomPositionInside()
 {
   // Return a random position inside this shape
 
-  double Phi = m_Phimin + gRandom->Rndm()*(m_Phimax-m_Phimin);
-  double Theta = acos(cos(m_Thetamin) - gRandom->Rndm()*(cos(m_Thetamin)-cos(m_Thetamax)));
+  double Phi = m_Phimin*c_Rad + gRandom->Rndm()*(m_Phimax*c_Rad-m_Phimin*c_Rad);
+  double Theta = acos(cos(m_Thetamin*c_Rad) - gRandom->Rndm()*(cos(m_Thetamin*c_Rad)-cos(m_Thetamax*c_Rad)));
   double R = pow(m_Rmin*m_Rmin*m_Rmin + (m_Rmax*m_Rmax*m_Rmax-m_Rmin*m_Rmin*m_Rmin)*gRandom->Rndm(), 1.0/3.0);
-    
+  
   return MVector(R*cos(Phi)*sin(Theta), R*sin(Phi)*sin(Theta), R*cos(Theta));
 }
 

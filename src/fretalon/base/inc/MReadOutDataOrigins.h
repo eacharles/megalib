@@ -33,7 +33,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 
 
-//! This basic read-out data just consisting of one timing value as unsigned int
+//! This basic read-out data just consisting of several simulation origin values as int
 class MReadOutDataOrigins : public MReadOutData
 {
   // public interface:
@@ -58,9 +58,9 @@ class MReadOutDataOrigins : public MReadOutData
   //! Clear the content of this read-out data element
   virtual void Clear();
 
-  //! Set the timing
+  //! Set the simulation origin values
   void SetOrigins(vector<int> Origins) { m_Origins = Origins; }
-  //! Get the timing
+  //! Get the simulation origin values
   vector<int> GetOrigins() const { return m_Origins; }
 
   //! Clone this data element - the returned element must be deleted

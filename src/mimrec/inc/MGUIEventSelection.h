@@ -99,9 +99,10 @@ class MGUIEventSelection : public MGUIDialog
   MGUIEEntry* m_MaxTimeEntry;
   TGRadioButton* m_GTIFileRB;
   MGUIEFileSelector* m_GTIFile;
-
-  TGListBox* m_DetectorList;
-
+  
+  TGListBox* m_FirstIADetectorList;
+  TGListBox* m_SecondIADetectorList;
+  
   MGUIEMinMaxEntry* m_TrackLength;
   MGUIEMinMaxEntry* m_SequenceLength;
   MGUIEMinMaxEntry* m_ClusteringQualityFactor;

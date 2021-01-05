@@ -1738,6 +1738,10 @@ bool MCSource::SetEnergy(double EnergyParam1,
       mout<<"  ***  ERROR  ***   "<<m_Name<<": The high-energy index must be smaller than 0!"<<endl;
       return false;
     }
+    if (m_EnergyParam4 >= m_EnergyParam3) {
+      mout<<"  ***  ERROR  ***   "<<m_Name<<": The low-energy index must be smaller than the high-energy index!"<<endl;
+      return false;
+    }
     if (m_EnergyParam5 <= m_EnergyParam1 || m_EnergyParam5 > m_EnergyParam2) {
       mout<<"  ***  ERROR  ***   "<<m_Name<<": The peak energy must be within the minimum and maximum energy!"<<endl;
       return false;
@@ -1773,7 +1777,7 @@ bool MCSource::UpgradeEnergy()
     
     // Calculate Maximum:
     m_EnergyParam6 = BandFunction(m_EnergyParam1, m_EnergyParam3, m_EnergyParam4, m_EnergyParam5);
-    cout<<"Band-Max: "<<m_EnergyParam6 <<endl;
+    //cout<<"Band-Max: "<<m_EnergyParam6 <<endl;
     //m_EnergyParam6 = BandFunction(m_EnergyParam3*m_EnergyParam5, m_EnergyParam3, m_EnergyParam4, m_EnergyParam5);
   }
   
@@ -2316,18 +2320,18 @@ bool MCSource::CalculateNextEmission(double Time, double /*Scale*/)
   // If we have a non-looping orientation, check if we are outside:
   if (m_Orientation.IsOriented() == true && m_Orientation.IsLooping() == false) {
     if (m_NextEmission > m_Orientation.GetStopTime()) {
+      mout<<m_Name<<": orientation data exceeded (next emission: "<<m_NextEmission/second<<" vs. max time: "<<m_Orientation.GetStopTime()/second<<")."<<endl;      
       m_IsActive = false;
       m_NextEmission = numeric_limits<double>::max();
-      mout<<m_Name<<": orientation data exceeded."<<endl;      
     }
   }
   
   const MCOrientation& Sky = MCRunManager::GetMCRunManager()->GetCurrentRun().GetSkyOrientationReference();
   if (Sky.IsOriented() == true && Sky.IsLooping() == false) {
     if (m_NextEmission > Sky.GetStopTime()) {
+      mout<<m_Name<<": orientation data exceeded (next emission: "<<m_NextEmission/second<<" vs. max time: "<<m_Orientation.GetStopTime()/second<<")."<<endl;      
       m_IsActive = false;
       m_NextEmission = numeric_limits<double>::max();
-      mout<<m_Name<<": orientation data exceeded."<<endl;      
     }
   }  
   
@@ -3253,6 +3257,12 @@ bool MCSource::GeneratePosition(G4GeneralParticleSource* Gun)
   } else {
     mout<<m_Name<<": You have a not allowed combination of rotations of the source and the sky!"<<endl;
     return false;
+  }
+  
+  // Sanity check that the position is within the world volume
+  if (MCRunManager::GetMCRunManager()->GetDetectorConstruction()->IsInsideWorldVolume(m_Position) == false) {
+    mout<<"  ***  ERROR  ***   "<<m_Name<<": The position "<<m_Position/cm<<" cm is outside the world volume! Please make your world volume larger or your simulations are incorrect!"<<endl;
+    return false;      
   }
   
   Gun->GetCurrentSource()->GetPosDist()->SetPosDisType("Point");

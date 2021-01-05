@@ -1153,14 +1153,14 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
       }
 
       // We have to use TString
-      TString Name = Tokenizer.GetTokenAtAsString(1).Data();
-      gSystem->ExpandPathName(Name);
+      MString Name = Tokenizer.GetTokenAtAsString(1).Data();
+      MFile::ExpandFileName(Name);
 
       if (gSystem->IsAbsoluteFileName(Name) == false) {
         Name.Prepend("/");
         Name.Prepend(MFile::GetDirectoryName(m_FileName));
 
-        gSystem->ExpandPathName(Name);
+        MFile::ExpandFileName(Name);
       }
 
       m_CrossSectionFileDirectory = Name;
@@ -2916,6 +2916,7 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
         if (D->GetType() == MDDetector::c_Voxel3D) {
           dynamic_cast<MDVoxel3D*>(D)->HasGuardRing(true);
           D->GetGuardRing()->SetActive(true);
+          D->GetGuardRing()->SetEnergyResolutionType(MDDetector::c_EnergyResolutionTypeGauss);
           D->GetGuardRing()->SetNoiseThresholdEqualsTriggerThreshold(true);
           D->GetGuardRing()->SetTriggerThreshold(Tokenizer.GetTokenAtAsDouble(2));
           if (Tokenizer.GetNTokens() == 4) {
@@ -2924,6 +2925,7 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
         } else {
           dynamic_cast<MDStrip2D*>(D)->HasGuardRing(true);
           D->GetGuardRing()->SetActive(true);
+          D->GetGuardRing()->SetEnergyResolutionType(MDDetector::c_EnergyResolutionTypeGauss);
           D->GetGuardRing()->SetNoiseThresholdEqualsTriggerThreshold(true);
           D->GetGuardRing()->SetTriggerThreshold(Tokenizer.GetTokenAtAsDouble(2));
           if (Tokenizer.GetNTokens() == 4) {
@@ -3191,22 +3193,32 @@ bool MDGeometry::ScanSetupFile(MString FileName, bool CreateNodes, bool Virtuali
           Typo("Option PositionResolution only supported for AngerCamera");
           return false;
         }
-        if (Tokenizer.GetNTokens() != 4) {
-          Typo("Line must contain two strings and 2 doubles,"
-               " e.g. \"Wafer.PositionResolutionAt 30 10\"");
+        if (Tokenizer.GetNTokens() == 4) {
+          dynamic_cast<MDAngerCamera*>(D)->SetPositionResolution(Tokenizer.GetTokenAtAsDouble(2),
+                                                                 Tokenizer.GetTokenAtAsDouble(3));
+        } else if (Tokenizer.GetNTokens() == 6) {
+          dynamic_cast<MDAngerCamera*>(D)->SetPositionResolutionXYZ(Tokenizer.GetTokenAtAsDouble(2),
+                                                                    Tokenizer.GetTokenAtAsDouble(3),
+                                                                    Tokenizer.GetTokenAtAsDouble(4),
+                                                                    Tokenizer.GetTokenAtAsDouble(5));
+        } else {
+          Typo("Line must contain either two strings and 2 doubles (for XY, XYZ positioning),"
+               " e.g. \"Anger.PositionResolutionAt 30 10\""
+               " or two strings and 4 doubles (for XYZ independent Gaussians positioning),"
+               " e.g. \"Anger.PositionResolutionAt 30 10 10 20\"");
           return false;
         }
-        dynamic_cast<MDAngerCamera*>(D)->SetPositionResolution(Tokenizer.GetTokenAtAsDouble(2),
-                                                               Tokenizer.GetTokenAtAsDouble(3));
       } else if (Tokenizer.IsTokenAt(1, "Positioning") == true) {
         if (D->GetType() == MDDetector::c_AngerCamera) {
           if (Tokenizer.GetNTokens() != 3) {
             Typo("Line must contain two strings and 1 double:"
-                 " e.g. \"Anger.Postioning XYZ\"");
+                 " e.g. \"Anger.Positioning XYZ\"");
             return false;
           }
           if (Tokenizer.GetTokenAtAsString(2) == "XYZ") {
             dynamic_cast<MDAngerCamera*>(D)->SetPositioning(MDGridPoint::c_XYZAnger);
+          } else if  (Tokenizer.GetTokenAtAsString(2) == "XYZIndependent") {
+            dynamic_cast<MDAngerCamera*>(D)->SetPositioning(MDGridPoint::c_XYZIndependentAnger);
           } else if  (Tokenizer.GetTokenAtAsString(2) == "XY") {
             dynamic_cast<MDAngerCamera*>(D)->SetPositioning(MDGridPoint::c_XYAnger);
           } else {

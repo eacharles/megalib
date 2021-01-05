@@ -71,6 +71,11 @@ class MRERawEvent : public MRESE, public MRotationInterface
   //! Set the time of the event -- ATTENTION: GetTime() returns the time of the RESE
   void SetEventTime(MTime Time) { m_EventTime = Time; }
   
+  //! Return the clock time (relative internal detector time) of the event 
+  MTime GetEventClock() const { return m_EventClock; }
+  //! Set the clock time  (relative internal detector time) of the event 
+  void SetEventClock(MTime Clock) { m_EventClock = Clock; }
+  
   
   int GetEventType();
   void SetEventType(int Type);
@@ -247,28 +252,30 @@ class MRERawEvent : public MRESE, public MRotationInterface
   static const int c_RejectionOneTrackOnly                       = 10;
   static const int c_RejectionTwoTracksOnly                      = 11;
   static const int c_RejectionTrackNotValid                      = 12;
-  static const int c_RejectionSequenceBad                        = 13;
-  static const int c_RejectionTooManyHits                        = 14;
-  static const int c_RejectionEventStartNotD1                    = 15;
-  static const int c_RejectionEventStartUndecided                = 16;
-  static const int c_RejectionElectronDirectionBad               = 17;
-  static const int c_RejectionCSRThreshold                       = 18;
-  static const int c_RejectionCSRNoGoodCombination               = 19;
-  static const int c_RejectionComptelTypeEvent                   = 20;
-  static const int c_RejectionComptelTypeKinematicsBad           = 21;
-  static const int c_RejectionSingleSiteEvent                    = 22;
-  static const int c_RejectionNoHits                             = 23;
-  static const int c_RejectionTotalEnergyOutOfLimits             = 24;
-  static const int c_RejectionLeverArmOutOfLimits                = 25;
-  static const int c_RejectionEventIdOutOfLimits                 = 26;
-  static const int c_RejectionNotFromObject                      = 27;
-  static const int c_RejectionTooManyUndecidedTrackElements      = 28;
-  static const int c_RejectionExternalBadEventFlag               = 29;
-  static const int c_RejectionEventClusteringTooManyHits         = 30;
-  static const int c_RejectionTooManyEventIncarnations           = 31;
-  static const int c_RejectionEventClusteringUnresolvedHits      = 32;
-  static const int c_RejectionEventClusteringNoOrigins           = 33;
-  static const int c_RejectionEventClusteringEnergyOutOfBounds   = 34;
+  static const int c_RejectionNoHitsInTracker                    = 13;
+  static const int c_RejectionSequenceBad                        = 14;
+  static const int c_RejectionTooManyHits                        = 15;
+  static const int c_RejectionEventStartNotD1                    = 16;
+  static const int c_RejectionEventStartUndecided                = 17;
+  static const int c_RejectionElectronDirectionBad               = 18;
+  static const int c_RejectionCSRThreshold                       = 19;
+  static const int c_RejectionCSRNoGoodCombination               = 20;
+  static const int c_RejectionComptelTypeEvent                   = 21;
+  static const int c_RejectionComptelTypeKinematicsBad           = 22;
+  static const int c_RejectionSingleSiteEvent                    = 23;
+  static const int c_RejectionNoHits                             = 24;
+  static const int c_RejectionTotalEnergyOutOfLimits             = 25;
+  static const int c_RejectionLeverArmOutOfLimits                = 26;
+  static const int c_RejectionEventIdOutOfLimits                 = 27;
+  static const int c_RejectionNotFromObject                      = 28;
+  static const int c_RejectionTooManyUndecidedTrackElements      = 29;
+  static const int c_RejectionExternalBadEventFlag               = 30;
+  static const int c_RejectionEventClusteringTooManyHits         = 31;
+  static const int c_RejectionTooManyEventIncarnations           = 32;
+  static const int c_RejectionEventClusteringUnresolvedHits      = 33;
+  static const int c_RejectionEventClusteringNoOrigins           = 34;
+  static const int c_RejectionEventClusteringEnergyOutOfBounds   = 35;
+
   
   static const double c_NoQualityFactor;
   static const double c_NoScore;
@@ -295,6 +302,8 @@ class MRERawEvent : public MRESE, public MRotationInterface
 
   //! The time this event happened
   MTime m_EventTime;
+  //! The clock time this event happened
+  MTime m_EventClock;
   //! The numerical ID
   unsigned long m_EventID;
   //! The type (Compton, etc.)
